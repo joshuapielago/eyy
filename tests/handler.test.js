@@ -1,13 +1,15 @@
 const { handleEvent } = require('../src/index');
 
 describe('handleEvent', () => {
-  test('slash command returns a dialog', async () => {
+  test('slash command returns a dialog (HTTP endpoint format)', async () => {
     const event = {
-      type: 'MESSAGE',
+      dialogEventType: 'REQUEST_DIALOG',
+      isDialogEvent: true,
       message: {
-        slashCommand: { commandId: '1' },
-        argumentText: '@Juan Dela Cruz',
+        slashCommand: { commandId: 1 },
+        argumentText: ' @Juan Dela Cruz',
         annotations: [
+          { type: 'SLASH_COMMAND', startIndex: 0, length: 4 },
           { type: 'USER_MENTION', userMention: { user: { displayName: 'Juan Dela Cruz', email: 'juan@lokal.ph' } } },
         ],
       },
@@ -21,9 +23,10 @@ describe('handleEvent', () => {
 
   test('slash command without mention still returns a dialog', async () => {
     const event = {
-      type: 'MESSAGE',
+      dialogEventType: 'REQUEST_DIALOG',
+      isDialogEvent: true,
       message: {
-        slashCommand: { commandId: '1' },
+        slashCommand: { commandId: 1 },
         argumentText: '',
       },
       user: { displayName: 'Maria Santos', email: 'maria@lokal.ph' },

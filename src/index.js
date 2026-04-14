@@ -15,8 +15,9 @@ async function handleEvent(event) {
   }
 
   // Slash command — open the dialog
-  if (event.type === 'MESSAGE' && event.message?.slashCommand) {
-    const mention = event.message.annotations?.find(
+  // HTTP endpoint events use dialogEventType instead of type === 'MESSAGE'
+  if (event.message?.slashCommand || event.dialogEventType === 'REQUEST_DIALOG') {
+    const mention = event.message?.annotations?.find(
       (a) => a.type === 'USER_MENTION'
     );
     const recipientName = mention?.userMention?.user?.displayName || '';
@@ -24,7 +25,7 @@ async function handleEvent(event) {
   }
 
   // Dialog form submission
-  if (event.type === 'CARD_CLICKED') {
+  if (event.dialogEventType === 'SUBMIT_DIALOG' || event.type === 'CARD_CLICKED') {
     const invokedFunction = event.common?.invokedFunction;
     if (invokedFunction === 'submitEyyy') {
       return handleSubmit(event);
