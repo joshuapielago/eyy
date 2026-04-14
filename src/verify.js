@@ -3,9 +3,9 @@ const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client();
 
 async function verifyGoogleToken(req) {
-  const projectNumber = process.env.GOOGLE_CHAT_PROJECT_NUMBER;
-  if (!projectNumber) {
-    console.warn('GOOGLE_CHAT_PROJECT_NUMBER not set, skipping verification');
+  const audience = process.env.GOOGLE_CHAT_AUDIENCE;
+  if (!audience) {
+    console.warn('GOOGLE_CHAT_AUDIENCE not set, skipping verification');
     return true;
   }
 
@@ -18,7 +18,7 @@ async function verifyGoogleToken(req) {
   try {
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: projectNumber,
+      audience,
     });
     return !!ticket;
   } catch (err) {
