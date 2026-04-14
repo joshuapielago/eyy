@@ -80,6 +80,8 @@ if (require.main === module) {
   app.use(express.json());
 
   app.post('/google-chat', async (req, res) => {
+    console.log('Incoming event:', JSON.stringify(req.body, null, 2));
+
     const isValid = await verifyGoogleToken(req);
     if (!isValid) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -87,6 +89,7 @@ if (require.main === module) {
 
     try {
       const response = await handleEvent(req.body);
+      console.log('Response:', JSON.stringify(response, null, 2));
       res.json(response);
     } catch (err) {
       console.error('Error handling event:', err);
