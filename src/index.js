@@ -24,11 +24,41 @@ async function handleEvent(rawEvent) {
 
   // Slash command — open the dialog
   if (message.slashCommand || payload.dialogEventType === 'REQUEST_DIALOG') {
-    const mention = (message.annotations || []).find(
-      (a) => a.type === 'USER_MENTION'
-    );
-    const recipientName = mention?.userMention?.user?.displayName || '';
-    return buildDialog({ recipientName });
+    // Minimal test dialog to isolate format issues
+    return {
+      actionResponse: {
+        type: 'DIALOG',
+        dialogAction: {
+          dialog: {
+            body: {
+              sections: [{
+                header: 'Test Dialog',
+                widgets: [
+                  {
+                    textInput: {
+                      name: 'testField',
+                      label: 'Type something',
+                    },
+                  },
+                  {
+                    buttonList: {
+                      buttons: [{
+                        text: 'Submit',
+                        onClick: {
+                          action: {
+                            function: 'submitEyyy',
+                          },
+                        },
+                      }],
+                    },
+                  },
+                ],
+              }],
+            },
+          },
+        },
+      },
+    };
   }
 
   // Dialog form submission
