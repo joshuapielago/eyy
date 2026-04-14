@@ -84,7 +84,11 @@ if (require.main === module) {
   app.use(express.json());
 
   app.post('/google-chat', async (req, res) => {
-    console.log('Incoming event:', JSON.stringify(req.body, null, 2));
+    console.log('TOP KEYS:', Object.keys(req.body));
+    console.log('appCommandPayload keys:', Object.keys(req.body.appCommandPayload || {}));
+    console.log('message keys:', Object.keys(req.body.message || {}));
+    console.log('event.type:', req.body.type);
+    console.log('event.dialogEventType:', req.body.dialogEventType);
 
     const isValid = await verifyGoogleToken(req);
     if (!isValid) {
