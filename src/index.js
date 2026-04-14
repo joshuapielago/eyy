@@ -6,21 +6,25 @@ const { fetchRandomGif } = require('./giphy');
 const { initDb, saveKudos } = require('./db');
 const { verifyGoogleToken } = require('./verify');
 
-async function handleEvent(event) {
-  // Google Chat HTTP endpoint nests slash command data inside appCommandPayload
-  const payload = event.appCommandPayload || event;
-  const message = payload.message || event.message;
+async function handleEvent(rawEvent) {
+  // Google Chat HTTP endpoint wraps everything:
+  // { commonEventObject, authorizationEventObject, chat: { user, appCommandPayload: { message, dialogEventType, ... } } }
+  const chat = rawEvent.chat || {};
+  const payload = chat.appCommandPayload || {};
+  const message = payload.message || {};
+  const user = chat.user || rawEvent.user || {};
+  const commonEvent = rawEvent.commonEventObject || {};
 
   // App added to a space
-  if (event.type === 'ADDED_TO_SPACE') {
+  if (chat.type === 'ADDED_TO_SPACE') {
     return {
       text: "EYYY! 🤙 I'm here to help you hype up your teammates!\n\nUse `/eyy @someone` to give an eyyy to a coworker.",
     };
   }
 
   // Slash command — open the dialog
-  if (message?.slashCommand || payload.dialogEventType === 'REQUEST_DIALOG') {
-    const mention = message?.annotations?.find(
+  if (message.slashCommand || payload.dialogEventType === 'REQUEST_DIALOG') {
+    const mention = (message.annotations || []).find(
       (a) => a.type === 'USER_MENTION'
     );
     const recipientName = mention?.userMention?.user?.displayName || '';
@@ -28,25 +32,30 @@ async function handleEvent(event) {
   }
 
   // Dialog form submission
-  if (payload.dialogEventType === 'SUBMIT_DIALOG' || event.type === 'CARD_CLICKED') {
-    const invokedFunction = event.common?.invokedFunction;
-    if (invokedFunction === 'submitEyyy') {
-      return handleSubmit(event);
-    }
+  if (payload.dialogEventType === 'SUBMIT_DIALOG') {
+    return handleSubmit(rawEvent);
   }
 
   return { text: 'Use `/eyy @someone` to give an eyyy! 🤙' };
 }
 
-async function handleSubmit(event) {
-  const formInputs = event.common?.formInputs || {};
-  const recipientName = formInputs.recipient?.stringInputs?.value?.[0] || 'Someone';
-  const message = formInputs.message?.stringInputs?.value?.[0] || '';
-  const valueKey = formInputs.valueKey?.stringInputs?.value?.[0] || 'speed';
+async function handleSubmit(rawEvent) {
+  const chat = rawEvent.chat || {};
+  const payload = chat.appCommandPayload || {};
+  const commonEvent = rawEvent.commonEventObject || {};
 
-  const senderName = event.user?.displayName || 'Someone';
-  const senderEmail = event.user?.email || '';
-  const spaceName = event.space?.name || '';
+  // Form inputs can be in commonEventObject.formInputs or payload level
+  const formInputs = commonEvent.formInputs || payload.common?.formInputs || {};
+  const getInput = (name) => formInputs[name]?.stringInputs?.value?.[0] || '';
+
+  const recipientName = getInput('recipient') || 'Someone';
+  const message = getInput('message') || '';
+  const valueKey = getInput('valueKey') || 'speed';
+
+  const user = chat.user || {};
+  const senderName = user.displayName || 'Someone';
+  const senderEmail = user.email || '';
+  const spaceName = payload.message?.space?.name || '';
 
   // Fetch a random gif for this value
   const searchTerm = getRandomGiphyTerm(valueKey);
@@ -84,10 +93,7 @@ if (require.main === module) {
   app.use(express.json());
 
   app.post('/google-chat', async (req, res) => {
-    console.log('TOP KEYS:', Object.keys(req.body));
-    console.log('chat keys:', Object.keys(req.body.chat || {}));
-    console.log('chat:', JSON.stringify(req.body.chat, null, 2));
-    console.log('commonEventObject keys:', Object.keys(req.body.commonEventObject || {}));
+    console.log('Event received:', req.body.chat?.appCommandPayload?.dialogEventType || 'unknown');
 
     const isValid = await verifyGoogleToken(req);
     if (!isValid) {
