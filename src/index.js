@@ -85,10 +85,9 @@ if (require.main === module) {
 
   app.post('/google-chat', async (req, res) => {
     console.log('TOP KEYS:', Object.keys(req.body));
-    console.log('appCommandPayload keys:', Object.keys(req.body.appCommandPayload || {}));
-    console.log('message keys:', Object.keys(req.body.message || {}));
-    console.log('event.type:', req.body.type);
-    console.log('event.dialogEventType:', req.body.dialogEventType);
+    console.log('chat keys:', Object.keys(req.body.chat || {}));
+    console.log('chat:', JSON.stringify(req.body.chat, null, 2));
+    console.log('commonEventObject keys:', Object.keys(req.body.commonEventObject || {}));
 
     const isValid = await verifyGoogleToken(req);
     if (!isValid) {
