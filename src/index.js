@@ -1,10 +1,74 @@
 const express = require('express');
-const { buildDialog } = require('./dialog');
 const { buildEyyyCard } = require('./card');
-const { getRandomGiphyTerm } = require('./values');
+const { VALUES, getRandomGiphyTerm } = require('./values');
 const { fetchRandomGif } = require('./giphy');
 const { initDb, saveKudos } = require('./db');
 const { verifyGoogleToken } = require('./verify');
+
+const ENDPOINT_URL = process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/google-chat`
+  : 'https://eyy-app-production.up.railway.app/google-chat';
+
+function buildRenderActionsDialog({ recipientName = '' } = {}) {
+  const valueItems = Object.entries(VALUES).map(([key, val]) => ({
+    text: `${val.emoji} ${val.name}`,
+    value: key,
+    selected: false,
+  }));
+
+  return {
+    renderActions: {
+      action: {
+        navigations: [{
+          pushCard: {
+            header: {
+              title: 'EYYY! Time to hype someone up!',
+            },
+            sections: [{
+              widgets: [
+                {
+                  textInput: {
+                    name: 'recipient',
+                    label: 'To',
+                    type: 'SINGLE_LINE',
+                    value: recipientName,
+                  },
+                },
+                {
+                  textInput: {
+                    name: 'message',
+                    label: 'What makes them awesome?',
+                    type: 'MULTIPLE_LINE',
+                  },
+                },
+                {
+                  selectionInput: {
+                    name: 'valueKey',
+                    label: 'Which LOKAL value do they embody?',
+                    type: 'DROPDOWN',
+                    items: valueItems,
+                  },
+                },
+                {
+                  buttonList: {
+                    buttons: [{
+                      text: 'Send the EYYY!',
+                      onClick: {
+                        action: {
+                          function: ENDPOINT_URL,
+                        },
+                      },
+                    }],
+                  },
+                },
+              ],
+            }],
+          },
+        }],
+      },
+    },
+  };
+}
 
 async function handleEvent(rawEvent) {
   // Google Chat HTTP endpoint wraps everything:
@@ -24,41 +88,11 @@ async function handleEvent(rawEvent) {
 
   // Slash command — open the dialog
   if (message.slashCommand || payload.dialogEventType === 'REQUEST_DIALOG') {
-    // Minimal test dialog to isolate format issues
-    return {
-      actionResponse: {
-        type: 'DIALOG',
-        dialogAction: {
-          dialog: {
-            body: {
-              sections: [{
-                header: 'Test Dialog',
-                widgets: [
-                  {
-                    textInput: {
-                      name: 'testField',
-                      label: 'Type something',
-                    },
-                  },
-                  {
-                    buttonList: {
-                      buttons: [{
-                        text: 'Submit',
-                        onClick: {
-                          action: {
-                            function: 'submitEyyy',
-                          },
-                        },
-                      }],
-                    },
-                  },
-                ],
-              }],
-            },
-          },
-        },
-      },
-    };
+    const mention = (message.annotations || []).find(
+      (a) => a.type === 'USER_MENTION'
+    );
+    const recipientName = mention?.userMention?.user?.displayName || '';
+    return buildRenderActionsDialog({ recipientName });
   }
 
   // Dialog form submission
@@ -107,13 +141,21 @@ async function handleSubmit(rawEvent) {
     console.error('Failed to save kudos:', err.message);
   }
 
-  // Build and return the eyyy card
+  // Build and return the eyyy card as a Chat message
   const card = buildEyyyCard({ senderName, recipientName, message, valueKey, gifUrl });
   return {
-    actionResponse: {
-      type: 'NEW_MESSAGE',
+    renderActions: {
+      action: {
+        navigations: [{ endNavigation: 'CLOSE_DIALOG' }],
+      },
     },
-    ...card,
+    hostAppDataAction: {
+      chatDataAction: {
+        createMessageAction: {
+          message: card,
+        },
+      },
+    },
   };
 }
 
