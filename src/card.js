@@ -8,7 +8,7 @@ const HYPE_HEADERS = [
   'BIG EYY ENERGY! 🤙⚡🤙',
 ];
 
-function buildEyyyCard({ senderName, recipientName, message, valueKey, gifUrl }) {
+function buildEyyyCard({ senderName, recipientName, recipientUserId, message, valueKey, gifUrl }) {
   const value = getValueByKey(valueKey);
   const hypeHeader = HYPE_HEADERS[Math.floor(Math.random() * HYPE_HEADERS.length)];
 
@@ -41,7 +41,9 @@ function buildEyyyCard({ senderName, recipientName, message, valueKey, gifUrl })
   }
 
   return {
-    text: `🤙 ${senderName} gave an eyyy to ${recipientName}!`,
+    text: recipientUserId
+      ? `🤙 ${senderName} gave an eyyy to <${recipientUserId}>!`
+      : `🤙 ${senderName} gave an eyyy to ${recipientName}!`,
     cardsV2: [
       {
         cardId: 'eyyyCard',

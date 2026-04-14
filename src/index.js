@@ -9,7 +9,7 @@ const ENDPOINT_URL = process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/google-chat`
   : 'https://eyy-app-production.up.railway.app/google-chat';
 
-function buildRenderActionsDialog({ recipientName = '' } = {}) {
+function buildRenderActionsDialog({ recipientName = '', recipientUserId = '' } = {}) {
   const valueItems = Object.entries(VALUES).map(([key, val]) => ({
     text: `${val.emoji} ${val.name}`,
     value: key,
@@ -51,6 +51,9 @@ function buildRenderActionsDialog({ recipientName = '' } = {}) {
               onClick: {
                 action: {
                   function: ENDPOINT_URL,
+                  parameters: [
+                    { key: 'recipientUserId', value: recipientUserId },
+                  ],
                 },
               },
             }],
@@ -90,7 +93,8 @@ async function handleEvent(rawEvent) {
       (a) => a.type === 'USER_MENTION'
     );
     const recipientName = mention?.userMention?.user?.displayName || '';
-    return buildRenderActionsDialog({ recipientName });
+    const recipientUserId = mention?.userMention?.user?.name || '';
+    return buildRenderActionsDialog({ recipientName, recipientUserId });
   }
 
   // Dialog form submission (button click from the dialog)
@@ -112,6 +116,10 @@ async function handleSubmit(rawEvent) {
   const recipientName = getInput('recipient') || 'Someone';
   const message = getInput('message') || '';
   const valueKey = getInput('valueKey') || 'speed';
+
+  // Recipient user ID comes from button action parameters
+  const params = commonEvent.parameters || {};
+  const recipientUserId = params.recipientUserId || '';
 
   const user = chat.user || {};
   const senderName = user.displayName || 'Someone';
@@ -141,8 +149,8 @@ async function handleSubmit(rawEvent) {
     console.error('Failed to save kudos:', err.message);
   }
 
-  // Build the eyyy card
-  const card = buildEyyyCard({ senderName, recipientName, message, valueKey, gifUrl });
+  // Build the eyyy card (include recipientUserId for @mention)
+  const card = buildEyyyCard({ senderName, recipientName, recipientUserId, message, valueKey, gifUrl });
 
   // Close dialog and post message using the add-ons framework format
   return {
