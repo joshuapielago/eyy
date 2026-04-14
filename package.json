@@ -1,0 +1,26 @@
+{
+  "name": "eyy",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest --verbose"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@giphy/js-fetch-api": "^5.7.0",
+    "express": "^5.2.1",
+    "google-auth-library": "^10.6.2",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "jest": "^30.3.0"
+  }
+}
