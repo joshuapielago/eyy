@@ -163,7 +163,12 @@ if (require.main === module) {
   app.use(express.json());
 
   app.post('/google-chat', async (req, res) => {
-    console.log('Event received:', req.body.chat?.appCommandPayload?.dialogEventType || 'unknown');
+    console.log('TOP KEYS:', Object.keys(req.body));
+    console.log('chat keys:', Object.keys(req.body.chat || {}));
+    console.log('commonEventObject keys:', Object.keys(req.body.commonEventObject || {}));
+    console.log('formInputs:', JSON.stringify(req.body.commonEventObject?.formInputs || 'none'));
+    console.log('invokedFunction:', req.body.commonEventObject?.invokedFunction || 'none');
+    console.log('dialogEventType:', req.body.chat?.appCommandPayload?.dialogEventType || 'none');
 
     const isValid = await verifyGoogleToken(req);
     if (!isValid) {
