@@ -7,6 +7,10 @@ const { initDb, saveKudos } = require('./db');
 const { verifyGoogleToken } = require('./verify');
 
 async function handleEvent(event) {
+  // Google Chat HTTP endpoint nests slash command data inside appCommandPayload
+  const payload = event.appCommandPayload || event;
+  const message = payload.message || event.message;
+
   // App added to a space
   if (event.type === 'ADDED_TO_SPACE') {
     return {
@@ -15,9 +19,8 @@ async function handleEvent(event) {
   }
 
   // Slash command — open the dialog
-  // HTTP endpoint events use dialogEventType instead of type === 'MESSAGE'
-  if (event.message?.slashCommand || event.dialogEventType === 'REQUEST_DIALOG') {
-    const mention = event.message?.annotations?.find(
+  if (message?.slashCommand || payload.dialogEventType === 'REQUEST_DIALOG') {
+    const mention = message?.annotations?.find(
       (a) => a.type === 'USER_MENTION'
     );
     const recipientName = mention?.userMention?.user?.displayName || '';
@@ -25,7 +28,7 @@ async function handleEvent(event) {
   }
 
   // Dialog form submission
-  if (event.dialogEventType === 'SUBMIT_DIALOG' || event.type === 'CARD_CLICKED') {
+  if (payload.dialogEventType === 'SUBMIT_DIALOG' || event.type === 'CARD_CLICKED') {
     const invokedFunction = event.common?.invokedFunction;
     if (invokedFunction === 'submitEyyy') {
       return handleSubmit(event);
