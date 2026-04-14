@@ -16,56 +16,54 @@ function buildRenderActionsDialog({ recipientName = '' } = {}) {
     selected: false,
   }));
 
-  return {
-    renderActions: {
-      action: {
-        navigations: [{
-          pushCard: {
-            header: {
-              title: 'EYYY! Time to hype someone up!',
-            },
-            sections: [{
-              widgets: [
-                {
-                  textInput: {
-                    name: 'recipient',
-                    label: 'To',
-                    type: 'SINGLE_LINE',
-                    value: recipientName,
-                  },
+  // Try all three formats — Google Chat should accept whichever matches the API version
+  const card = {
+    header: { title: 'EYYY! Time to hype someone up!' },
+    sections: [{
+      widgets: [
+        {
+          textInput: {
+            name: 'recipient',
+            label: 'To',
+            type: 'SINGLE_LINE',
+            value: recipientName,
+          },
+        },
+        {
+          textInput: {
+            name: 'message',
+            label: 'What makes them awesome?',
+            type: 'MULTIPLE_LINE',
+          },
+        },
+        {
+          selectionInput: {
+            name: 'valueKey',
+            label: 'Which LOKAL value do they embody?',
+            type: 'DROPDOWN',
+            items: valueItems,
+          },
+        },
+        {
+          buttonList: {
+            buttons: [{
+              text: 'Send the EYYY!',
+              onClick: {
+                action: {
+                  function: ENDPOINT_URL,
                 },
-                {
-                  textInput: {
-                    name: 'message',
-                    label: 'What makes them awesome?',
-                    type: 'MULTIPLE_LINE',
-                  },
-                },
-                {
-                  selectionInput: {
-                    name: 'valueKey',
-                    label: 'Which LOKAL value do they embody?',
-                    type: 'DROPDOWN',
-                    items: valueItems,
-                  },
-                },
-                {
-                  buttonList: {
-                    buttons: [{
-                      text: 'Send the EYYY!',
-                      onClick: {
-                        action: {
-                          function: ENDPOINT_URL,
-                        },
-                      },
-                    }],
-                  },
-                },
-              ],
+              },
             }],
           },
-        }],
-      },
+        },
+      ],
+    }],
+  };
+
+  return {
+    // Format from alternate-runtimes Node.js example (no renderActions wrapper)
+    action: {
+      navigations: [{ pushCard: card }],
     },
   };
 }
