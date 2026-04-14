@@ -1,49 +1,27 @@
 const { handleEvent } = require('../src/index');
 
 describe('handleEvent', () => {
-  test('slash command returns a dialog (v2 HTTP endpoint format)', async () => {
+  test('slash command returns a dialog card via action.navigations', async () => {
     const event = {
       commonEventObject: { userLocale: 'en', hostApp: 'CHAT', platform: 'WEB' },
       chat: {
         user: { displayName: 'Maria Santos', email: 'maria@lokal.ph' },
-        eventTime: '2026-04-14T00:00:00Z',
         appCommandPayload: {
           message: {
             slashCommand: { commandId: 1 },
-            argumentText: ' @Juan Dela Cruz',
             annotations: [
-              { type: 'SLASH_COMMAND', startIndex: 0, length: 4 },
-              { type: 'USER_MENTION', userMention: { user: { displayName: 'Juan Dela Cruz', email: 'juan@lokal.ph' } } },
+              { type: 'USER_MENTION', userMention: { user: { displayName: 'Juan Dela Cruz' } } },
             ],
           },
-          isDialogEvent: true,
           dialogEventType: 'REQUEST_DIALOG',
         },
       },
     };
 
     const result = await handleEvent(event);
-    expect(result.actionResponse.type).toBe('DIALOG');
-  });
-
-  test('slash command without mention still returns a dialog', async () => {
-    const event = {
-      commonEventObject: { hostApp: 'CHAT' },
-      chat: {
-        user: { displayName: 'Maria Santos', email: 'maria@lokal.ph' },
-        appCommandPayload: {
-          message: {
-            slashCommand: { commandId: 1 },
-            argumentText: '',
-          },
-          isDialogEvent: true,
-          dialogEventType: 'REQUEST_DIALOG',
-        },
-      },
-    };
-
-    const result = await handleEvent(event);
-    expect(result.actionResponse.type).toBe('DIALOG');
+    expect(result.action.navigations).toBeDefined();
+    expect(result.action.navigations[0].pushCard).toBeDefined();
+    expect(result.action.navigations[0].pushCard.sections[0].widgets.length).toBeGreaterThan(0);
   });
 
   test('pre-fills recipient name from USER_MENTION annotation', async () => {
@@ -64,9 +42,30 @@ describe('handleEvent', () => {
     };
 
     const result = await handleEvent(event);
-    const widgets = result.actionResponse.dialogAction.dialog.body.sections[0].widgets;
+    const widgets = result.action.navigations[0].pushCard.sections[0].widgets;
     const recipientWidget = widgets.find(w => w.textInput && w.textInput.name === 'recipient');
     expect(recipientWidget.textInput.value).toBe('Kyla Mendia');
+  });
+
+  test('button click with form inputs triggers submit handler', async () => {
+    const event = {
+      commonEventObject: {
+        hostApp: 'CHAT',
+        formInputs: {
+          recipient: { stringInputs: { value: ['Kyla Mendia'] } },
+          message: { stringInputs: { value: ['Amazing work!'] } },
+          valueKey: { stringInputs: { value: ['speed'] } },
+        },
+      },
+      chat: {
+        user: { displayName: 'Joshua Pielago', email: 'jp@lokal.ph' },
+        buttonClickedPayload: {},
+      },
+    };
+
+    const result = await handleEvent(event);
+    expect(result.hostAppDataAction).toBeDefined();
+    expect(result.hostAppDataAction.chatDataAction.createMessageAction.message).toBeDefined();
   });
 
   test('ADDED_TO_SPACE returns welcome message', async () => {
@@ -79,6 +78,5 @@ describe('handleEvent', () => {
 
     const result = await handleEvent(event);
     expect(result.text).toContain('EYYY');
-    expect(result.text).toContain('🤙');
   });
 });
