@@ -93,8 +93,8 @@ async function handleEvent(rawEvent) {
     return buildRenderActionsDialog({ recipientName });
   }
 
-  // Dialog form submission
-  if (payload.dialogEventType === 'SUBMIT_DIALOG') {
+  // Dialog form submission (button click from the dialog)
+  if (chat.buttonClickedPayload || payload.dialogEventType === 'SUBMIT_DIALOG') {
     return handleSubmit(rawEvent);
   }
 
@@ -103,11 +103,10 @@ async function handleEvent(rawEvent) {
 
 async function handleSubmit(rawEvent) {
   const chat = rawEvent.chat || {};
-  const payload = chat.appCommandPayload || {};
   const commonEvent = rawEvent.commonEventObject || {};
 
-  // Form inputs can be in commonEventObject.formInputs or payload level
-  const formInputs = commonEvent.formInputs || payload.common?.formInputs || {};
+  // Form inputs are in commonEventObject.formInputs
+  const formInputs = commonEvent.formInputs || {};
   const getInput = (name) => formInputs[name]?.stringInputs?.value?.[0] || '';
 
   const recipientName = getInput('recipient') || 'Someone';
@@ -117,7 +116,10 @@ async function handleSubmit(rawEvent) {
   const user = chat.user || {};
   const senderName = user.displayName || 'Someone';
   const senderEmail = user.email || '';
-  const spaceName = payload.message?.space?.name || '';
+
+  // Get space name from buttonClickedPayload
+  const buttonPayload = chat.buttonClickedPayload || {};
+  const spaceName = buttonPayload.message?.space?.name || '';
 
   // Fetch a random gif for this value
   const searchTerm = getRandomGiphyTerm(valueKey);
@@ -128,7 +130,7 @@ async function handleSubmit(rawEvent) {
     await saveKudos({
       senderEmail,
       senderName,
-      recipientEmail: '', // Not always available from form input
+      recipientEmail: '',
       recipientName,
       message,
       valueKey,
@@ -139,14 +141,11 @@ async function handleSubmit(rawEvent) {
     console.error('Failed to save kudos:', err.message);
   }
 
-  // Build and return the eyyy card as a Chat message
+  // Build the eyyy card
   const card = buildEyyyCard({ senderName, recipientName, message, valueKey, gifUrl });
+
+  // Close dialog and post message using the add-ons framework format
   return {
-    renderActions: {
-      action: {
-        navigations: [{ endNavigation: 'CLOSE_DIALOG' }],
-      },
-    },
     hostAppDataAction: {
       chatDataAction: {
         createMessageAction: {
