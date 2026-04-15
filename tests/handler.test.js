@@ -127,7 +127,32 @@ describe('handleEvent', () => {
     );
   });
 
-  test('ADDED_TO_SPACE returns welcome message', async () => {
+  test('ADDED_TO_SPACE with slash command opens dialog (auto-install)', async () => {
+    const event = {
+      commonEventObject: { hostApp: 'CHAT' },
+      chat: {
+        type: 'ADDED_TO_SPACE',
+        user: { displayName: 'Maria Santos' },
+        appCommandPayload: {
+          message: {
+            slashCommand: { commandId: 1 },
+            annotations: [
+              { type: 'USER_MENTION', userMention: { user: { displayName: 'Chip Lopez' } } },
+            ],
+          },
+          dialogEventType: 'REQUEST_DIALOG',
+        },
+      },
+    };
+
+    const result = await handleEvent(event);
+    // Should open dialog, NOT return welcome text
+    expect(result.action.navigations).toBeDefined();
+    expect(result.action.navigations[0].pushCard).toBeDefined();
+    expect(result.text).toBeUndefined();
+  });
+
+  test('ADDED_TO_SPACE without slash command returns welcome message', async () => {
     const event = {
       chat: {
         type: 'ADDED_TO_SPACE',

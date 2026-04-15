@@ -80,14 +80,8 @@ async function handleEvent(rawEvent) {
   const user = chat.user || rawEvent.user || {};
   const commonEvent = rawEvent.commonEventObject || {};
 
-  // App added to a space
-  if (chat.type === 'ADDED_TO_SPACE') {
-    return {
-      text: "EYYY! 🤙 I'm here to help you hype up your teammates!\n\nUse `/eyy @someone` to give an eyyy to a coworker.",
-    };
-  }
-
-  // Slash command — open the dialog
+  // Slash command — open the dialog (check before ADDED_TO_SPACE because
+  // Google Chat sends both together when the app is auto-installed via /eyy)
   if (message.slashCommand || payload.dialogEventType === 'REQUEST_DIALOG') {
     const mention = (message.annotations || []).find(
       (a) => a.type === 'USER_MENTION'
@@ -95,6 +89,13 @@ async function handleEvent(rawEvent) {
     const recipientName = mention?.userMention?.user?.displayName || '';
     const recipientUserId = mention?.userMention?.user?.name || '';
     return buildRenderActionsDialog({ recipientName, recipientUserId });
+  }
+
+  // App added to a space (without a slash command)
+  if (chat.type === 'ADDED_TO_SPACE') {
+    return {
+      text: "EYYY! 🤙 I'm here to help you hype up your teammates!\n\nUse `/eyy @someone` to give an eyyy to a coworker.",
+    };
   }
 
   // Dialog form submission (button click from the dialog)
