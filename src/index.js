@@ -2,7 +2,7 @@ const express = require('express');
 const { buildEyyyCard } = require('./card');
 const { VALUES, getRandomGiphyTerm, getValueByKey } = require('./values');
 const { fetchRandomGif } = require('./giphy');
-const { initDb, saveKudos } = require('./db');
+const { pool, initDb, saveKudos } = require('./db');
 const { verifyGoogleToken } = require('./verify');
 
 const ENDPOINT_URL = process.env.RAILWAY_PUBLIC_DOMAIN

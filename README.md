@@ -77,7 +77,7 @@ npm start
 PORT=3000                              # Server port (default: 3000)
 DATABASE_URL=postgresql://localhost/eyy # PostgreSQL connection string
 GIPHY_API_KEY=your_giphy_api_key       # Giphy developer API key
-GOOGLE_CHAT_PROJECT_NUMBER=123456      # Google Cloud project number
+GOOGLE_CHAT_AUDIENCE=https://your-domain/google-chat  # Token verification audience
 ```
 
 Railway deployments also use `RAILWAY_PUBLIC_DOMAIN` to construct the webhook URL.
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS kudos (
 npm test
 ```
 
-Runs 24 tests across handler, card, values, dialog, and giphy modules.
+Runs 27 tests across handler, card, values, dialog, and giphy modules.
 
 ## Endpoints
 
