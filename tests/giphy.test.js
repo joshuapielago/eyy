@@ -1,29 +1,62 @@
-const { fetchRandomGif } = require('../src/giphy');
+const mockSearch = jest.fn();
+
+jest.mock('@giphy/js-fetch-api', () => ({
+  GiphyFetch: jest.fn(() => ({ search: mockSearch })),
+}));
 
 describe('giphy', () => {
-  test('fetchRandomGif returns a URL string on success', async () => {
-    // Uses the real Giphy API with the SDK key in env
-    // If GIPHY_API_KEY is not set, skip
-    if (!process.env.GIPHY_API_KEY) {
-      console.log('Skipping: GIPHY_API_KEY not set');
-      return;
-    }
-    const url = await fetchRandomGif('celebration');
-    expect(typeof url).toBe('string');
-    expect(url).toMatch(/^https?:\/\//);
+  const origKey = process.env.GIPHY_API_KEY;
+
+  beforeEach(() => {
+    jest.resetModules();
+    mockSearch.mockReset();
+    process.env.GIPHY_API_KEY = 'test-key';
   });
 
-  test('fetchRandomGif returns null on failure', async () => {
-    // Temporarily use an invalid key to test failure path
-    const origKey = process.env.GIPHY_API_KEY;
-    process.env.GIPHY_API_KEY = 'invalid_key_for_test';
+  afterAll(() => {
+    if (origKey) {
+      process.env.GIPHY_API_KEY = origKey;
+    } else {
+      delete process.env.GIPHY_API_KEY;
+    }
+  });
 
-    // Re-require to pick up new key — but since module caches, we test the catch
-    const { fetchRandomGif: fetchWithBadKey } = require('../src/giphy');
-    const url = await fetchWithBadKey('test');
-    // Should return null on error, not throw
+  test('fetchRandomGif returns a URL string on success', async () => {
+    mockSearch.mockResolvedValue({
+      data: [
+        { images: { fixed_height: { url: 'https://giphy.com/test.gif' } } },
+        { images: { fixed_height: { url: 'https://giphy.com/test2.gif' } } },
+      ],
+    });
+
+    const { fetchRandomGif } = require('../src/giphy');
+    const url = await fetchRandomGif('celebration');
+    expect(typeof url).toBe('string');
+    expect(url).toMatch(/^https:\/\/giphy\.com/);
+    expect(mockSearch).toHaveBeenCalledWith('celebration', { limit: 25, rating: 'pg' });
+  });
+
+  test('fetchRandomGif returns null when search returns empty results', async () => {
+    mockSearch.mockResolvedValue({ data: [] });
+
+    const { fetchRandomGif } = require('../src/giphy');
+    const url = await fetchRandomGif('nothing');
     expect(url).toBeNull();
+  });
 
-    process.env.GIPHY_API_KEY = origKey;
+  test('fetchRandomGif returns null on API error', async () => {
+    mockSearch.mockRejectedValue(new Error('API error'));
+
+    const { fetchRandomGif } = require('../src/giphy');
+    const url = await fetchRandomGif('test');
+    expect(url).toBeNull();
+  });
+
+  test('fetchRandomGif returns null when GIPHY_API_KEY is not set', async () => {
+    delete process.env.GIPHY_API_KEY;
+
+    const { fetchRandomGif } = require('../src/giphy');
+    const url = await fetchRandomGif('test');
+    expect(url).toBeNull();
   });
 });

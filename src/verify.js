@@ -5,8 +5,12 @@ const client = new OAuth2Client();
 async function verifyGoogleToken(req) {
   const audience = process.env.GOOGLE_CHAT_AUDIENCE;
   if (!audience) {
-    console.warn('GOOGLE_CHAT_AUDIENCE not set, skipping verification');
-    return true;
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('GOOGLE_CHAT_AUDIENCE not set, skipping verification (dev mode)');
+      return true;
+    }
+    console.error('GOOGLE_CHAT_AUDIENCE not set — rejecting request');
+    return false;
   }
 
   const bearer = req.headers.authorization;
