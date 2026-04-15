@@ -1,8 +1,8 @@
 const express = require('express');
 const { buildEyyyCard } = require('./card');
-const { VALUES, getRandomGiphyTerm } = require('./values');
+const { VALUES, getRandomGiphyTerm, getValueByKey } = require('./values');
 const { fetchRandomGif } = require('./giphy');
-const { initDb, saveKudos } = require('./db');
+const { pool, initDb, saveKudos } = require('./db');
 const { verifyGoogleToken } = require('./verify');
 
 const ENDPOINT_URL = process.env.RAILWAY_PUBLIC_DOMAIN
@@ -115,7 +115,8 @@ async function handleSubmit(rawEvent) {
 
   const recipientName = getInput('recipient') || 'Someone';
   const message = getInput('message') || '';
-  const valueKey = getInput('valueKey') || 'speed';
+  const rawValueKey = getInput('valueKey') || 'speed';
+  const valueKey = getValueByKey(rawValueKey) ? rawValueKey : 'speed';
 
   // Recipient user ID comes from button action parameters
   const params = commonEvent.parameters || {};
@@ -140,6 +141,7 @@ async function handleSubmit(rawEvent) {
       senderName,
       recipientEmail: '',
       recipientName,
+      recipientUserId,
       message,
       valueKey,
       gifUrl,
@@ -184,7 +186,7 @@ if (require.main === module) {
       res.json(response);
     } catch (err) {
       console.error('Error handling event:', err);
-      res.json({ text: 'Oops, something went wrong! Try again 🤙' });
+      res.status(500).json({ text: 'Oops, something went wrong! Try again 🤙' });
     }
   });
 
@@ -194,18 +196,33 @@ if (require.main === module) {
 
   const PORT = process.env.PORT || 3000;
 
-  initDb()
-    .then(() => {
-      app.listen(PORT, () => {
-        console.log(`EYY server running on port ${PORT} 🤙`);
+  const startServer = () => {
+    const server = app.listen(PORT, () => {
+      console.log(`EYY server running on port ${PORT} 🤙`);
+    });
+
+    const shutdown = (signal) => {
+      console.log(`${signal} received, shutting down gracefully...`);
+      server.close(() => {
+        pool.end().then(() => {
+          console.log('Database pool closed');
+          process.exit(0);
+        });
       });
-    })
+      // Force exit after 10s if graceful shutdown stalls
+      setTimeout(() => process.exit(1), 10000).unref();
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+  };
+
+  initDb()
+    .then(startServer)
     .catch((err) => {
       console.error('Failed to initialize database:', err.message);
       // Start server anyway — DB will retry on next request
-      app.listen(PORT, () => {
-        console.log(`EYY server running on port ${PORT} (DB init failed) 🤙`);
-      });
+      startServer();
     });
 }
 

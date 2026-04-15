@@ -15,12 +15,12 @@ async function initDb() {
   await pool.query(schema);
 }
 
-async function saveKudos({ senderEmail, senderName, recipientEmail, recipientName, message, valueKey, gifUrl, spaceName }) {
+async function saveKudos({ senderEmail, senderName, recipientEmail, recipientName, recipientUserId, message, valueKey, gifUrl, spaceName }) {
   const result = await pool.query(
-    `INSERT INTO kudos (sender_email, sender_name, recipient_email, recipient_name, message, value_key, gif_url, space_name)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO kudos (sender_email, sender_name, recipient_email, recipient_name, recipient_user_id, message, value_key, gif_url, space_name)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id`,
-    [senderEmail, senderName, recipientEmail, recipientName, message, valueKey, gifUrl, spaceName]
+    [senderEmail, senderName, recipientEmail, recipientName, recipientUserId || '', message, valueKey, gifUrl, spaceName]
   );
   return result.rows[0];
 }
