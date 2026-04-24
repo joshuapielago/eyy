@@ -1,0 +1,33 @@
+name: Repo Status
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 19 * * *'  # 5am Sydney (AEST=UTC+10) / 4am AEDT
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate STATUS.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/generate-status.sh
+      - name: Commit if changed
+        run: |
+          if [[ -n "$(git status --porcelain STATUS.md)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add STATUS.md
+            git commit -m "chore: update STATUS.md [skip ci]"
+            git push
+          fi
