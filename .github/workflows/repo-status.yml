@@ -55,7 +55,10 @@ jobs:
               exit 0
             fi
             echo "Push failed on attempt $attempt — pulling with rebase and retrying."
-            git pull --rebase origin "$GITHUB_REF_NAME" || true
+            if ! git pull --rebase origin "$GITHUB_REF_NAME"; then
+              echo "Rebase failed (conflict?) — aborting in-progress rebase before next retry."
+              git rebase --abort 2>/dev/null || true
+            fi
           done
           echo "::error::Could not push STATUS.md after 5 retries."
           exit 1
