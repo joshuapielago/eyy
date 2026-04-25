@@ -67,10 +67,15 @@ const shortSha = shOrEmpty('git', ['rev-parse', '--short', 'HEAD']);
 // `origin/<branch>` as a fallback — on a detached-HEAD or shallow
 // checkout the local `main` ref may not exist even when the remote
 // tracking ref does. Falls back to null when both lookups fail.
+// Exclude the workflow's own STATUS.md update commits — otherwise once the
+// bot pushes one, `days_since_last_commit` collapses to ~1 even when no real
+// development happened, which inverts the stale-repo heuristic.
+const STATUS_BOT_COMMIT_PATTERN = '^chore: update STATUS.md';
 function resolveLastCommitTs() {
-  const local = parseInt(shOrEmpty('git', ['log', '-1', '--format=%ct', defaultBranch]) || '0', 10);
+  const baseArgs = ['log', '-1', '--format=%ct', '--invert-grep', `--grep=${STATUS_BOT_COMMIT_PATTERN}`];
+  const local = parseInt(shOrEmpty('git', [...baseArgs, defaultBranch]) || '0', 10);
   if (local) return local;
-  const remote = parseInt(shOrEmpty('git', ['log', '-1', '--format=%ct', `origin/${defaultBranch}`]) || '0', 10);
+  const remote = parseInt(shOrEmpty('git', [...baseArgs, `origin/${defaultBranch}`]) || '0', 10);
   return remote || 0;
 }
 const lastCommitTs = resolveLastCommitTs();
