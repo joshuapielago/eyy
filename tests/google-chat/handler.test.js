@@ -1,17 +1,20 @@
-jest.mock('../src/db', () => ({
+jest.mock('../../src/shared/db', () => ({
   saveKudos: jest.fn().mockResolvedValue({ id: 1 }),
   initDb: jest.fn().mockResolvedValue(),
+  pool: { end: jest.fn() },
 }));
 
-jest.mock('../src/giphy', () => ({
+jest.mock('../../src/shared/giphy', () => ({
   fetchRandomGif: jest.fn().mockResolvedValue('https://giphy.com/mock.gif'),
 }));
 
-const { handleEvent } = require('../src/index');
-const { saveKudos } = require('../src/db');
-const { fetchRandomGif } = require('../src/giphy');
+const { handleEventFactory } = require('../../src/platforms/google-chat/handler');
+const { saveKudos } = require('../../src/shared/db');
+const { fetchRandomGif } = require('../../src/shared/giphy');
 
-describe('handleEvent', () => {
+const handleEvent = handleEventFactory({ submitUrl: 'https://example.test/google-chat' });
+
+describe('google-chat handleEvent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -83,24 +86,21 @@ describe('handleEvent', () => {
 
     const result = await handleEvent(event);
 
-    // Returns a card response
     expect(result.hostAppDataAction).toBeDefined();
     expect(result.hostAppDataAction.chatDataAction.createMessageAction.message).toBeDefined();
 
-    // Saved kudos with correct arguments
-    expect(saveKudos).toHaveBeenCalledWith({
+    expect(saveKudos).toHaveBeenCalledWith(expect.objectContaining({
+      platform: 'google-chat',
       senderEmail: 'jp@lokal.ph',
       senderName: 'Joshua Pielago',
-      recipientEmail: '',
       recipientName: 'Kyla Mendia',
       recipientUserId: 'users/12345',
       message: 'Amazing work!',
       valueKey: 'speed',
       gifUrl: 'https://giphy.com/mock.gif',
       spaceName: 'spaces/ABC',
-    });
+    }));
 
-    // Fetched a gif
     expect(fetchRandomGif).toHaveBeenCalled();
   });
 
@@ -146,7 +146,6 @@ describe('handleEvent', () => {
     };
 
     const result = await handleEvent(event);
-    // Should open dialog, NOT return welcome text
     expect(result.action.navigations).toBeDefined();
     expect(result.action.navigations[0].pushCard).toBeDefined();
     expect(result.text).toBeUndefined();

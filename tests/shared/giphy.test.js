@@ -29,7 +29,7 @@ describe('giphy', () => {
       ],
     });
 
-    const { fetchRandomGif } = require('../src/giphy');
+    const { fetchRandomGif } = require('../../src/shared/giphy');
     const url = await fetchRandomGif('celebration');
     expect(typeof url).toBe('string');
     expect(url).toMatch(/^https:\/\/giphy\.com/);
@@ -39,7 +39,7 @@ describe('giphy', () => {
   test('fetchRandomGif returns null when search returns empty results', async () => {
     mockSearch.mockResolvedValue({ data: [] });
 
-    const { fetchRandomGif } = require('../src/giphy');
+    const { fetchRandomGif } = require('../../src/shared/giphy');
     const url = await fetchRandomGif('nothing');
     expect(url).toBeNull();
   });
@@ -47,7 +47,7 @@ describe('giphy', () => {
   test('fetchRandomGif returns null on API error', async () => {
     mockSearch.mockRejectedValue(new Error('API error'));
 
-    const { fetchRandomGif } = require('../src/giphy');
+    const { fetchRandomGif } = require('../../src/shared/giphy');
     const url = await fetchRandomGif('test');
     expect(url).toBeNull();
   });
@@ -55,7 +55,7 @@ describe('giphy', () => {
   test('fetchRandomGif returns null when GIPHY_API_KEY is not set', async () => {
     delete process.env.GIPHY_API_KEY;
 
-    const { fetchRandomGif } = require('../src/giphy');
+    const { fetchRandomGif } = require('../../src/shared/giphy');
     const url = await fetchRandomGif('test');
     expect(url).toBeNull();
   });

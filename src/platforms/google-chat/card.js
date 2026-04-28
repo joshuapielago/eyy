@@ -1,4 +1,5 @@
-const { getValueByKey } = require('./values');
+const { getValueByKey } = require('../../shared/values');
+const { escapeHtml } = require('../../shared/sanitize');
 
 const HYPE_HEADERS = [
   'EYYY! 🤙🔥🤙',
@@ -12,21 +13,27 @@ function buildEyyyCard({ senderName, recipientName, recipientUserId, message, va
   const value = getValueByKey(valueKey);
   const hypeHeader = HYPE_HEADERS[Math.floor(Math.random() * HYPE_HEADERS.length)];
 
+  const sender = escapeHtml(senderName);
+  const recipient = escapeHtml(recipientName);
+  const safeMessage = escapeHtml(message);
+  const valueName = escapeHtml(value.name);
+  const valueTagline = escapeHtml(value.tagline);
+
   const widgets = [
     {
       textParagraph: {
-        text: `<b>${senderName}</b> gave an eyyy to <b>${recipientName}</b> 🤙`,
+        text: `<b>${sender}</b> gave an eyyy to <b>${recipient}</b> 🤙`,
       },
     },
     { divider: {} },
     {
       textParagraph: {
-        text: `<i>"${message}"</i>`,
+        text: `<i>"${safeMessage}"</i>`,
       },
     },
     {
       textParagraph: {
-        text: `${value.emoji} <b>${value.name}</b> · <i>"${value.tagline}"</i>`,
+        text: `${value.emoji} <b>${valueName}</b> · <i>"${valueTagline}"</i>`,
       },
     },
   ];
