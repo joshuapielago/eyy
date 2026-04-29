@@ -1,4 +1,4 @@
-const { buildEyyyCard, HYPE_HEADERS } = require('../src/card');
+const { buildEyyyCard, HYPE_HEADERS } = require('../../src/platforms/google-chat/card');
 
 describe('buildEyyyCard', () => {
   const input = {

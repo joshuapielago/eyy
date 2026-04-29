@@ -1,4 +1,4 @@
-const { VALUES, getValueByKey, getRandomGiphyTerm } = require('../src/values');
+const { VALUES, getValueByKey, getRandomGiphyTerm } = require('../../src/shared/values');
 
 describe('values', () => {
   test('has exactly 7 values', () => {
