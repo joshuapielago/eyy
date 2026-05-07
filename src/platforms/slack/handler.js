@@ -66,16 +66,23 @@ async function buildAndPostLeaderboard({ channelId, userId, responseUrl }) {
     return;
   }
 
-  const [stats, verbatims] = await Promise.all([
-    getReceivedStats(invoker.email).catch((err) => {
-      console.error('[slack] getReceivedStats failed:', err.message);
-      return { counts: emptyCounts(), total: 0 };
-    }),
-    getRecentVerbatims(invoker.email, 5).catch((err) => {
-      console.error('[slack] getRecentVerbatims failed:', err.message);
-      return [];
-    }),
-  ]);
+  let stats;
+  try {
+    stats = await getReceivedStats(invoker.email);
+  } catch (err) {
+    console.error('[slack] getReceivedStats failed:', err.message);
+    await sendEphemeral(responseUrl, channelId, userId,
+      "Couldn't load your stats — try again in a moment.");
+    return;
+  }
+
+  // Verbatims are best-effort: a missing recent-quotes section is fine,
+  // but a stats failure must NOT be silently treated as "zero kudos" —
+  // that would show the user a misleading "no eyys yet" empty state.
+  const verbatims = await getRecentVerbatims(invoker.email, 5).catch((err) => {
+    console.error('[slack] getRecentVerbatims failed:', err.message);
+    return [];
+  });
 
   if (stats.total === 0) {
     const ephemeral = buildEmptyLeaderboardEphemeral(invoker.name || 'you');

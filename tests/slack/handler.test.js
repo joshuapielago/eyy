@@ -217,6 +217,47 @@ describe('buildAndPostLeaderboard', () => {
     expect(mockChatPostMessage).not.toHaveBeenCalled();
     expect(global.fetch).toHaveBeenCalled();
   });
+
+  test('stats query failure → "Couldn\'t load" ephemeral, NOT empty-state', async () => {
+    // Critical distinction: a DB outage must not look like "you have zero
+    // kudos" to the user. If getReceivedStats throws, we error-out clearly.
+    getReceivedStats.mockRejectedValue(new Error('connection refused'));
+    getRecentVerbatims.mockResolvedValue([]);
+
+    await buildAndPostLeaderboard({
+      channelId: 'C42',
+      userId: 'U_INV',
+      responseUrl: 'https://hooks.slack.com/x',
+    });
+
+    expect(mockChatPostMessage).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalled();
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(body.text).toMatch(/couldn't load your stats/i);
+    expect(body.text).not.toMatch(/keep being awesome/i);
+  });
+
+  test('verbatims query failure is tolerated (chart still posts)', async () => {
+    // Best-effort: missing recent-quotes section is fine, leaderboard
+    // can still render a useful chart.
+    getReceivedStats.mockResolvedValue({
+      counts: { speed: 3, talent: 0, kind: 5, hightech: 0, creative: 1, clear: 0, lead: 2 },
+      total: 11,
+    });
+    getRecentVerbatims.mockRejectedValue(new Error('verbatims blew up'));
+
+    await buildAndPostLeaderboard({
+      channelId: 'C42',
+      userId: 'U_INV',
+      responseUrl: 'https://hooks.slack.com/x',
+    });
+
+    expect(mockChatPostMessage).toHaveBeenCalledTimes(1);
+    const post = mockChatPostMessage.mock.calls[0][0];
+    expect(post.blocks.find((b) => b.type === 'header')).toBeTruthy();
+    // No "Recent eyys you've received" section since verbatims was empty.
+    expect(post.blocks.some((b) => b.text?.text?.includes("Recent eyys"))).toBe(false);
+  });
 });
 
 describe('handleViewSubmission — multi-recipient submit', () => {
