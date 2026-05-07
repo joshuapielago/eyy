@@ -71,12 +71,24 @@ describe('getReceivedStats', () => {
     expect(result.total).toBe(4);
   });
 
-  test('queries by email when both email and userId given (email wins)', async () => {
-    pool.query.mockResolvedValueOnce({ rows: [] });
+  test('uses OR clause across email and user_id when both given', async () => {
+    // Critical for Google Chat invokers: their event payload includes email,
+    // but Google Chat kudos rows store recipient_email = ''. Without ORing
+    // recipient_user_id, the leaderboard would always be empty for them.
+    pool.query.mockResolvedValueOnce({ rows: [{ value_key: 'kind', n: '3' }] });
     await getReceivedStats({ email: 'a@b.com', userId: 'users/x' });
     const [sql, params] = pool.query.mock.calls[0];
-    expect(sql).toMatch(/recipient_email = \$1/);
-    expect(params).toEqual(['a@b.com']);
+    expect(sql).toMatch(/recipient_email = \$1 OR recipient_user_id = \$2/);
+    expect(params).toEqual(['a@b.com', 'users/x']);
+  });
+
+  test('verbatims also OR across email and user_id with shifted LIMIT param', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    await getRecentVerbatims({ email: 'a@b.com', userId: 'users/x' }, 7);
+    const [sql, params] = pool.query.mock.calls[0];
+    expect(sql).toMatch(/recipient_email = \$1 OR recipient_user_id = \$2/);
+    expect(sql).toMatch(/LIMIT \$3/);
+    expect(params).toEqual(['a@b.com', 'users/x', 7]);
   });
 
   test('returns empty counts when both email and userId are missing', async () => {

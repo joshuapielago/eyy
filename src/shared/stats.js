@@ -12,11 +12,24 @@ function emptyCounts() {
 }
 
 function buildIdentityClause(identity) {
-  if (identity?.email) {
-    return { clause: 'recipient_email = $1', param: identity.email };
+  // When both email and userId are given (typical Google Chat invoker), match
+  // EITHER. This is required because Google Chat rows save recipient_email = ''
+  // and only populate recipient_user_id; an email-only WHERE would always
+  // return zero results for Google Chat kudos. ORing both also lets a
+  // Google-Chat invoker who has Slack-given kudos see them in their leaderboard.
+  const email = identity?.email || '';
+  const userId = identity?.userId || '';
+  if (email && userId) {
+    return {
+      clause: '(recipient_email = $1 OR recipient_user_id = $2)',
+      params: [email, userId],
+    };
   }
-  if (identity?.userId) {
-    return { clause: 'recipient_user_id = $1', param: identity.userId };
+  if (email) {
+    return { clause: 'recipient_email = $1', params: [email] };
+  }
+  if (userId) {
+    return { clause: 'recipient_user_id = $1', params: [userId] };
   }
   return null;
 }
@@ -32,7 +45,7 @@ async function getReceivedStats(identity) {
        FROM kudos
       WHERE ${where.clause}
       GROUP BY value_key`,
-    [where.param]
+    where.params
   );
 
   const counts = emptyCounts();
@@ -52,14 +65,15 @@ async function getRecentVerbatims(identity, limit = 5) {
   if (!where) return [];
 
   const safeLimit = Math.max(1, Math.min(MAX_VERBATIMS, Math.floor(limit) || 5));
+  const limitPlaceholder = `$${where.params.length + 1}`;
 
   const { rows } = await pool.query(
     `SELECT sender_name, message, value_key, created_at, platform
        FROM kudos
       WHERE ${where.clause}
       ORDER BY created_at DESC
-      LIMIT $2`,
-    [where.param, safeLimit]
+      LIMIT ${limitPlaceholder}`,
+    [...where.params, safeLimit]
   );
 
   return rows.map((r) => {
