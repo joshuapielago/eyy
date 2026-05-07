@@ -20,6 +20,7 @@ const {
   getRecentVerbatims,
   getTeamLeaderboard,
 } = require('../../shared/stats');
+const { learnFromParticipant } = require('../../shared/identity');
 
 function handleEventFactory({ submitUrl }) {
   async function handleEvent(rawEvent) {
@@ -124,13 +125,14 @@ async function handleSubmit(rawEvent) {
   const user = chat.user || {};
   const senderName = user.displayName || 'Someone';
   const senderEmail = user.email || '';
+  const senderId = userIdFromGoogleUser(user);
 
   const buttonPayload = chat.buttonClickedPayload || {};
   const spaceName = buttonPayload.message?.space?.name || '';
 
   const { gifUrl } = await recordKudosBatch({
     platform: 'google-chat',
-    sender: { name: senderName, email: senderEmail },
+    sender: { id: senderId, name: senderName, email: senderEmail },
     recipients,
     message,
     valueKey,
@@ -162,6 +164,10 @@ async function handleLeaderboard(rawEvent) {
   const userId = userIdFromGoogleUser(user);
   const userName = user.displayName || 'You';
   const userEmail = user.email || '';
+
+  // Capture the (email ↔ google_user_id) link from the invoker's event payload.
+  // This is the lowest-cost moment to learn it — no API call needed.
+  await learnFromParticipant('google-chat', { id: userId, email: userEmail, name: userName });
 
   let stats;
   try {
@@ -201,7 +207,14 @@ async function handleLeaderboard(rawEvent) {
 
 async function handleTeamLeaderboard(rawEvent) {
   const chat = rawEvent.chat || {};
-  const userId = userIdFromGoogleUser(chat.user || {});
+  const user = chat.user || {};
+  const userId = userIdFromGoogleUser(user);
+
+  await learnFromParticipant('google-chat', {
+    id: userId,
+    email: user.email || '',
+    name: user.displayName || '',
+  });
 
   let entries;
   try {

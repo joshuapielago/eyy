@@ -13,6 +13,7 @@ const {
 } = require('../../shared/stats');
 const { parseSlashCommand, SLACK_MENTION_REGEX } = require('../../shared/commands');
 const { getSlackClient } = require('./client');
+const { learnFromParticipant } = require('../../shared/identity');
 
 const SLACK_USER_MENTION_FIRST = /<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/;
 
@@ -72,6 +73,10 @@ async function handleSlashCommand(body) {
 
 async function buildAndPostLeaderboard({ channelId, userId, responseUrl }) {
   const invoker = await lookupSlackUser(userId);
+
+  // Cheapest place to capture (email ↔ slack_user_id) for someone who only
+  // ever invokes /eyy me — no extra API call beyond the one we already made.
+  await learnFromParticipant('slack', invoker);
 
   if (!invoker.email) {
     await sendEphemeral(responseUrl, channelId, userId,

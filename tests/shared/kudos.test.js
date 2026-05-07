@@ -6,10 +6,14 @@ jest.mock('../../src/shared/db', () => ({
 jest.mock('../../src/shared/giphy', () => ({
   fetchRandomGif: jest.fn().mockResolvedValue('https://giphy.com/x.gif'),
 }));
+jest.mock('../../src/shared/identity', () => ({
+  learnFromParticipant: jest.fn().mockResolvedValue(null),
+}));
 
 const { recordKudos } = require('../../src/shared/kudos');
 const { saveKudos } = require('../../src/shared/db');
 const { fetchRandomGif } = require('../../src/shared/giphy');
+const { learnFromParticipant } = require('../../src/shared/identity');
 
 describe('recordKudos', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -78,5 +82,19 @@ describe('recordKudos', () => {
     });
     expect(result.gifUrl).toBeNull();
     expect(saveKudos).toHaveBeenCalledWith(expect.objectContaining({ gifUrl: null }));
+  });
+
+  test('learns identity for both sender and recipient with platform tag', async () => {
+    await recordKudos({
+      platform: 'slack',
+      sender: { id: 'U1', name: 'Sender', email: 's@x.com' },
+      recipient: { id: 'U2', name: 'Recipient', email: 'r@x.com' },
+      message: 'm',
+      valueKey: 'speed',
+      channel: 'C',
+    });
+    expect(learnFromParticipant).toHaveBeenCalledTimes(2);
+    expect(learnFromParticipant).toHaveBeenCalledWith('slack', expect.objectContaining({ id: 'U1' }));
+    expect(learnFromParticipant).toHaveBeenCalledWith('slack', expect.objectContaining({ id: 'U2' }));
   });
 });

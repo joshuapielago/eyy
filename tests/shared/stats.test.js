@@ -171,6 +171,20 @@ describe('getRecentVerbatims', () => {
 describe('getTeamLeaderboard', () => {
   beforeEach(() => jest.clearAllMocks());
 
+  test('joins user_identity for canonicalization and unambiguous-name fallback', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    await getTeamLeaderboard({ limit: 5 });
+    const [sql] = pool.query.mock.calls[0];
+    // Joins to user_identity by user_id (Slack OR Google)
+    expect(sql).toMatch(/LEFT JOIN user_identity/);
+    expect(sql).toMatch(/slack_user_id = k\.recipient_user_id OR ui_id\.google_user_id = k\.recipient_user_id/);
+    // The unambiguous-name CTE must filter to one-email-per-name to avoid
+    // false merges of two people who share a display name.
+    expect(sql).toMatch(/HAVING COUNT\(DISTINCT email\) = 1/);
+    // Canonical key prefers email > learned email > user_id > name
+    expect(sql).toMatch(/COALESCE/);
+  });
+
   test('returns ranked entries with name, total, top value', async () => {
     pool.query.mockResolvedValueOnce({
       rows: [

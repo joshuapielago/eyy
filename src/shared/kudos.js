@@ -2,8 +2,17 @@ const { randomUUID } = require('crypto');
 const { getValueByKey, getRandomGiphyTerm } = require('./values');
 const { fetchRandomGif } = require('./giphy');
 const { saveKudos, saveKudosBatch } = require('./db');
+const { learnFromParticipant } = require('./identity');
 
 const DEFAULT_VALUE_KEY = 'speed';
+
+async function learnAll(platform, participants) {
+  // Best-effort identity learning. Run after the kudos save so a transient
+  // identity-store error never silently drops a kudos.
+  await Promise.all(
+    participants.filter(Boolean).map((p) => learnFromParticipant(platform, p))
+  );
+}
 
 async function recordKudos({ platform, sender, recipient, message, valueKey, channel }) {
   const resolvedValueKey = getValueByKey(valueKey) ? valueKey : DEFAULT_VALUE_KEY;
@@ -28,6 +37,8 @@ async function recordKudos({ platform, sender, recipient, message, valueKey, cha
   } catch (err) {
     console.error('Failed to save kudos:', err.message);
   }
+
+  await learnAll(platform, [sender, recipient]);
 
   return { valueKey: resolvedValueKey, valueDef, gifUrl };
 }
@@ -61,6 +72,8 @@ async function recordKudosBatch({ platform, sender, recipients, message, valueKe
   } catch (err) {
     console.error('Failed to save kudos batch:', err.message);
   }
+
+  await learnAll(platform, [sender, ...list]);
 
   return { valueKey: resolvedValueKey, valueDef, gifUrl, groupId };
 }

@@ -15,6 +15,10 @@ jest.mock('../../src/shared/stats', () => ({
   getTeamLeaderboard: jest.fn(),
 }));
 
+jest.mock('../../src/shared/identity', () => ({
+  learnFromParticipant: jest.fn().mockResolvedValue(null),
+}));
+
 jest.mock('../../src/shared/quickchart', () => {
   const actual = jest.requireActual('../../src/shared/quickchart');
   return {

@@ -40,3 +40,22 @@ CREATE INDEX IF NOT EXISTS idx_kudos_recipient_recent
   ON kudos (recipient_email, created_at DESC)
   WHERE recipient_email <> '';
 CREATE INDEX IF NOT EXISTS idx_kudos_group ON kudos (kudos_group_id) WHERE kudos_group_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS user_identity (
+  id SERIAL PRIMARY KEY,
+  email TEXT,
+  slack_user_id TEXT,
+  google_user_id TEXT,
+  display_name TEXT,
+  name_key TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_identity_email
+  ON user_identity (email) WHERE email IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_identity_slack
+  ON user_identity (slack_user_id) WHERE slack_user_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_identity_google
+  ON user_identity (google_user_id) WHERE google_user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_user_identity_name
+  ON user_identity (name_key) WHERE name_key IS NOT NULL;

@@ -92,42 +92,63 @@ async function getRecentVerbatims(identity, limit = 5) {
 
 async function getTeamLeaderboard({ limit = 10 } = {}) {
   // Top N recipients by total kudos count, all-time, both platforms combined.
-  // Identity_key coalesces email > user_id > name so Slack and Google Chat
-  // rows for the same person merge when they share an email but stay separate
-  // when only one identity field is populated.
+  //
+  // Identity resolution is layered: a kudos row's canonical key prefers its
+  // own recipient_email, then a learned email via user_identity (matched by
+  // slack_user_id or google_user_id), then a learned email by unambiguous
+  // name match, then user_id, then a normalized name. The unambiguous-name
+  // CTE deliberately filters out names mapped to multiple distinct emails to
+  // avoid merging two people who share a display name.
   const safeLimit = Math.max(1, Math.min(50, Math.floor(limit) || 10));
 
   const { rows } = await pool.query(
-    `WITH unified AS (
+    `WITH name_index AS (
+       SELECT name_key, MIN(email) AS email
+         FROM user_identity
+        WHERE email IS NOT NULL AND name_key IS NOT NULL
+        GROUP BY name_key
+       HAVING COUNT(DISTINCT email) = 1
+     ),
+     resolved AS (
        SELECT
-         CASE
-           WHEN recipient_email <> '' THEN recipient_email
-           WHEN recipient_user_id <> '' THEN recipient_user_id
-           ELSE recipient_name
-         END AS identity_key,
-         recipient_name,
-         recipient_email,
-         recipient_user_id,
-         value_key
-       FROM kudos
-       WHERE recipient_email <> '' OR recipient_user_id <> '' OR recipient_name <> ''
+         k.recipient_name,
+         k.recipient_email,
+         k.recipient_user_id,
+         k.value_key,
+         COALESCE(
+           NULLIF(k.recipient_email, ''),
+           ui_id.email,
+           ni.email,
+           NULLIF(k.recipient_user_id, ''),
+           NULLIF(LOWER(BTRIM(k.recipient_name)), '')
+         ) AS identity_key
+       FROM kudos k
+       LEFT JOIN user_identity ui_id
+         ON k.recipient_user_id <> ''
+        AND (ui_id.slack_user_id = k.recipient_user_id OR ui_id.google_user_id = k.recipient_user_id)
+        AND ui_id.email IS NOT NULL
+       LEFT JOIN name_index ni
+         ON k.recipient_name <> ''
+        AND ni.name_key = LOWER(BTRIM(k.recipient_name))
+       WHERE k.recipient_email <> '' OR k.recipient_user_id <> '' OR k.recipient_name <> ''
      ),
      totals AS (
        SELECT identity_key, COUNT(*) AS total_n
-       FROM unified
-       GROUP BY identity_key
-       ORDER BY total_n DESC
-       LIMIT $1
+         FROM resolved
+        WHERE identity_key IS NOT NULL
+        GROUP BY identity_key
+        ORDER BY total_n DESC
+        LIMIT $1
      ),
      by_value AS (
        SELECT
-         u.identity_key,
-         u.value_key,
+         r.identity_key,
+         r.value_key,
          COUNT(*) AS n,
-         ROW_NUMBER() OVER (PARTITION BY u.identity_key ORDER BY COUNT(*) DESC) AS rn
-       FROM unified u
-       WHERE u.identity_key IN (SELECT identity_key FROM totals)
-       GROUP BY u.identity_key, u.value_key
+         ROW_NUMBER() OVER (PARTITION BY r.identity_key ORDER BY COUNT(*) DESC) AS rn
+       FROM resolved r
+       WHERE r.identity_key IN (SELECT identity_key FROM totals)
+       GROUP BY r.identity_key, r.value_key
      ),
      names AS (
        SELECT DISTINCT ON (identity_key)
@@ -135,9 +156,13 @@ async function getTeamLeaderboard({ limit = 10 } = {}) {
          recipient_name,
          recipient_email,
          recipient_user_id
-       FROM unified
+       FROM resolved
        WHERE identity_key IN (SELECT identity_key FROM totals)
          AND recipient_name <> ''
+       ORDER BY identity_key,
+         CASE WHEN recipient_email <> '' THEN 0 ELSE 1 END,
+         CASE WHEN recipient_user_id <> '' THEN 0 ELSE 1 END,
+         recipient_name
      )
      SELECT
        t.identity_key,
