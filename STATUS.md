@@ -1,8 +1,8 @@
 ---
 repo: joshuapielago/eyy
-updated: 2026-05-07T10:46:30Z
+updated: 2026-05-07T12:23:11Z
 branch: master
-commit: d973530
+commit: 2080f82
 counts:
   open_prs: 0
   open_issues: 0
@@ -14,11 +14,11 @@ counts:
 # Status — joshuapielago/eyy
 
 ## Recent commits (last 5 on default branch)
+- `2080f82` · Joshua · 2026-05-07 · feat: /eyy leaderboard now shows team-wide ranking; personal radar moved to /eyy me
+- `5efe82d` · github-actions[bot] · 2026-05-07 · chore: update STATUS.md [skip ci]
 - `d973530` · JP · 2026-05-07 · feat: leaderboard, prefill, and multi-recipient kudos (#4)
 - `007a813` · github-actions[bot] · 2026-05-06 · chore: update STATUS.md [skip ci]
 - `e0169fa` · github-actions[bot] · 2026-05-06 · chore: update STATUS.md [skip ci]
-- `225dcac` · JP · 2026-05-06 · Add STATUS.md workflow for multi-repo rollup (#2)
-- `970b47c` · JP · 2026-04-30 · feat: add Slack integration alongside Google Chat (#3)
 
 ## Open pull requests
 _None_
