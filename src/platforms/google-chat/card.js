@@ -9,20 +9,51 @@ const HYPE_HEADERS = [
   'BIG EYY ENERGY! 🤙⚡🤙',
 ];
 
-function buildEyyyCard({ senderName, recipientName, recipientUserId, message, valueKey, gifUrl }) {
+function formatRecipientsHtml(recipients) {
+  // recipients: [{ id, name }]. id may be 'users/123' or empty.
+  // Google Chat renders <users/N> tokens natively; for entries without an id
+  // we fall back to the escaped display name.
+  return recipients
+    .map((r) => {
+      if (r.id) return `<users/${stripUsersPrefix(r.id)}>`;
+      const safe = escapeHtml(r.name || 'a teammate');
+      return `<b>${safe}</b>`;
+    })
+    .join(' ');
+}
+
+function stripUsersPrefix(id) {
+  return String(id).startsWith('users/') ? String(id).slice('users/'.length) : String(id);
+}
+
+function buildEyyyCard({
+  senderName,
+  recipients,
+  // Backward-compat single-recipient fields:
+  recipientName,
+  recipientUserId,
+  message,
+  valueKey,
+  gifUrl,
+}) {
   const value = getValueByKey(valueKey);
   const hypeHeader = HYPE_HEADERS[Math.floor(Math.random() * HYPE_HEADERS.length)];
 
+  const resolvedRecipients = Array.isArray(recipients) && recipients.length > 0
+    ? recipients
+    : [{ id: recipientUserId || '', name: recipientName || '' }];
+
   const sender = escapeHtml(senderName);
-  const recipient = escapeHtml(recipientName);
   const safeMessage = escapeHtml(message);
   const valueName = escapeHtml(value.name);
   const valueTagline = escapeHtml(value.tagline);
+  const recipientList = formatRecipientsHtml(resolvedRecipients);
+  const verb = resolvedRecipients.length > 1 ? 'gave eyyys to' : 'gave an eyyy to';
 
   const widgets = [
     {
       textParagraph: {
-        text: `<b>${sender}</b> gave an eyyy to <b>${recipient}</b> 🤙`,
+        text: `<b>${sender}</b> ${verb} ${recipientList} 🤙`,
       },
     },
     { divider: {} },
@@ -47,10 +78,12 @@ function buildEyyyCard({ senderName, recipientName, recipientUserId, message, va
     });
   }
 
+  const fallbackNames = resolvedRecipients
+    .map((r) => r.name || (r.id ? `<${r.id}>` : 'a teammate'))
+    .join(', ');
+
   return {
-    text: recipientUserId
-      ? `🤙 ${senderName} gave an eyyy to <${recipientUserId}>!`
-      : `🤙 ${senderName} gave an eyyy to ${recipientName}!`,
+    text: `🤙 ${senderName} ${verb} ${fallbackNames}!`,
     cardsV2: [
       {
         cardId: 'eyyyCard',
@@ -72,4 +105,4 @@ function buildEyyyCard({ senderName, recipientName, recipientUserId, message, va
   };
 }
 
-module.exports = { buildEyyyCard, HYPE_HEADERS };
+module.exports = { buildEyyyCard, HYPE_HEADERS, formatRecipientsHtml };

@@ -8,19 +8,37 @@ const ACTION_RECIPIENT = 'recipient_action';
 const ACTION_MESSAGE = 'message_action';
 const ACTION_VALUE = 'value_action';
 
-function buildEyyyModal({ channelId, prefilledUserId } = {}) {
+const MAX_RECIPIENTS = 10;
+const MAX_MESSAGE_LENGTH = 3000;
+
+function buildEyyyModal({
+  channelId,
+  prefilledUserIds = [],
+  prefilledMessage = '',
+} = {}) {
   const valueOptions = Object.entries(VALUES).map(([key, val]) => ({
     text: { type: 'plain_text', text: `${val.emoji} ${val.name}`, emoji: true },
     value: key,
   }));
 
   const recipientElement = {
-    type: 'users_select',
+    type: 'multi_users_select',
     action_id: ACTION_RECIPIENT,
-    placeholder: { type: 'plain_text', text: 'Pick a teammate', emoji: true },
+    placeholder: { type: 'plain_text', text: 'Pick one or more teammates', emoji: true },
+    max_selected_items: MAX_RECIPIENTS,
   };
-  if (prefilledUserId) {
-    recipientElement.initial_user = prefilledUserId;
+  if (Array.isArray(prefilledUserIds) && prefilledUserIds.length > 0) {
+    recipientElement.initial_users = prefilledUserIds.slice(0, MAX_RECIPIENTS);
+  }
+
+  const messageElement = {
+    type: 'plain_text_input',
+    action_id: ACTION_MESSAGE,
+    multiline: true,
+    max_length: MAX_MESSAGE_LENGTH,
+  };
+  if (prefilledMessage) {
+    messageElement.initial_value = String(prefilledMessage).slice(0, MAX_MESSAGE_LENGTH);
   }
 
   return {
@@ -41,11 +59,7 @@ function buildEyyyModal({ channelId, prefilledUserId } = {}) {
         type: 'input',
         block_id: BLOCK_MESSAGE,
         label: { type: 'plain_text', text: 'What makes them awesome?', emoji: true },
-        element: {
-          type: 'plain_text_input',
-          action_id: ACTION_MESSAGE,
-          multiline: true,
-        },
+        element: messageElement,
       },
       {
         type: 'input',
@@ -64,10 +78,9 @@ function buildEyyyModal({ channelId, prefilledUserId } = {}) {
 
 function readModalSubmission(view) {
   const values = view?.state?.values || {};
-  const recipientUserId =
-    values[BLOCK_RECIPIENT]?.[ACTION_RECIPIENT]?.selected_user || '';
-  const message =
-    values[BLOCK_MESSAGE]?.[ACTION_MESSAGE]?.value || '';
+  const recipientUserIds =
+    values[BLOCK_RECIPIENT]?.[ACTION_RECIPIENT]?.selected_users || [];
+  const message = values[BLOCK_MESSAGE]?.[ACTION_MESSAGE]?.value || '';
   const valueKey =
     values[BLOCK_VALUE]?.[ACTION_VALUE]?.selected_option?.value || '';
 
@@ -79,7 +92,7 @@ function readModalSubmission(view) {
     channelId = '';
   }
 
-  return { recipientUserId, message, valueKey, channelId };
+  return { recipientUserIds, message, valueKey, channelId };
 }
 
 module.exports = {
@@ -92,4 +105,6 @@ module.exports = {
   ACTION_RECIPIENT,
   ACTION_MESSAGE,
   ACTION_VALUE,
+  MAX_RECIPIENTS,
+  MAX_MESSAGE_LENGTH,
 };

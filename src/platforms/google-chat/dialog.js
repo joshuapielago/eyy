@@ -1,11 +1,22 @@
 const { VALUES } = require('../../shared/values');
 
-function buildRenderActionsDialog({ submitUrl, recipientName = '', recipientUserId = '' } = {}) {
+function buildRenderActionsDialog({
+  submitUrl,
+  recipientHint = '',
+  recipientUserIds = [],
+  recipientNames = [],
+  prefilledMessage = '',
+} = {}) {
   const valueItems = Object.entries(VALUES).map(([key, val]) => ({
     text: `${val.emoji} ${val.name}`,
     value: key,
     selected: false,
   }));
+
+  // recipientHint is shown to the user as a placeholder text in the input.
+  // recipientUserIds is metadata we round-trip through the form so the submit
+  // handler can reconstruct who was tagged via the originating slash command.
+  const recipientNamesString = (recipientNames || []).filter(Boolean).join(', ');
 
   const card = {
     header: { title: 'EYYY! Time to hype someone up!' },
@@ -14,9 +25,10 @@ function buildRenderActionsDialog({ submitUrl, recipientName = '', recipientUser
         {
           textInput: {
             name: 'recipient',
-            label: 'To',
-            type: 'SINGLE_LINE',
-            value: recipientName,
+            label: 'To (tag teammates with @)',
+            type: 'MULTIPLE_LINE',
+            value: recipientNamesString,
+            hintText: recipientHint || 'Tag one or more teammates with @',
           },
         },
         {
@@ -24,6 +36,7 @@ function buildRenderActionsDialog({ submitUrl, recipientName = '', recipientUser
             name: 'message',
             label: 'What makes them awesome?',
             type: 'MULTIPLE_LINE',
+            value: prefilledMessage || '',
           },
         },
         {
@@ -42,7 +55,8 @@ function buildRenderActionsDialog({ submitUrl, recipientName = '', recipientUser
                 action: {
                   function: submitUrl,
                   parameters: [
-                    { key: 'recipientUserId', value: recipientUserId },
+                    { key: 'recipientUserIds', value: (recipientUserIds || []).join(',') },
+                    { key: 'recipientNames', value: recipientNamesString },
                   ],
                 },
               },

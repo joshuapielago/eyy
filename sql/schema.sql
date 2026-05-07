@@ -23,8 +23,20 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
+DO $$ BEGIN
+  ALTER TABLE kudos ADD COLUMN IF NOT EXISTS kudos_group_id UUID;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_kudos_sender_email ON kudos (sender_email);
 CREATE INDEX IF NOT EXISTS idx_kudos_recipient_user_id ON kudos (recipient_user_id);
 CREATE INDEX IF NOT EXISTS idx_kudos_space_name ON kudos (space_name);
 CREATE INDEX IF NOT EXISTS idx_kudos_platform ON kudos (platform);
 CREATE INDEX IF NOT EXISTS idx_kudos_created_at ON kudos (created_at);
+CREATE INDEX IF NOT EXISTS idx_kudos_recipient_value
+  ON kudos (recipient_email, value_key)
+  WHERE recipient_email <> '';
+CREATE INDEX IF NOT EXISTS idx_kudos_recipient_recent
+  ON kudos (recipient_email, created_at DESC)
+  WHERE recipient_email <> '';
+CREATE INDEX IF NOT EXISTS idx_kudos_group ON kudos (kudos_group_id) WHERE kudos_group_id IS NOT NULL;
