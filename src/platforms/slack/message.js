@@ -9,15 +9,42 @@ const HYPE_HEADERS = [
   'BIG EYY ENERGY! 🤙⚡🤙',
 ];
 
-function buildEyyyBlocks({ senderName, recipientUserId, recipientName, message, valueKey, gifUrl }) {
+function formatRecipientsForBlocks(recipients) {
+  // recipients: array of { id, name } — id is the Slack user ID (no <@> wrap).
+  return recipients
+    .map((r) =>
+      r.id ? `<@${r.id}>` : `*${escapeSlackMrkdwn(r.name || 'a teammate')}*`
+    )
+    .join(' ');
+}
+
+function formatRecipientsForFallback(recipients) {
+  return recipients
+    .map((r) => (r.id ? `<@${r.id}>` : r.name || 'a teammate'))
+    .join(' ');
+}
+
+function buildEyyyBlocks({
+  senderName,
+  recipients = [],
+  // Backward-compat single-recipient fields:
+  recipientUserId,
+  recipientName,
+  message,
+  valueKey,
+  gifUrl,
+}) {
   const value = getValueByKey(valueKey);
   const hypeHeader = HYPE_HEADERS[Math.floor(Math.random() * HYPE_HEADERS.length)];
 
+  const resolvedRecipients = recipients.length > 0
+    ? recipients
+    : [{ id: recipientUserId || '', name: recipientName || '' }];
+
   const safeSender = escapeSlackMrkdwn(senderName);
   const safeMessage = escapeSlackMrkdwn(message);
-  const recipientRef = recipientUserId
-    ? `<@${recipientUserId}>`
-    : `*${escapeSlackMrkdwn(recipientName || 'a teammate')}*`;
+  const recipientList = formatRecipientsForBlocks(resolvedRecipients);
+  const verb = resolvedRecipients.length > 1 ? 'gave eyyys to' : 'gave an eyyy to';
 
   const blocks = [
     {
@@ -28,7 +55,7 @@ function buildEyyyBlocks({ senderName, recipientUserId, recipientName, message, 
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*${safeSender}* gave an eyyy to ${recipientRef} 🤙`,
+        text: `*${safeSender}* ${verb} ${recipientList} 🤙`,
       },
     },
     { type: 'divider' },
@@ -58,9 +85,7 @@ function buildEyyyBlocks({ senderName, recipientUserId, recipientName, message, 
     });
   }
 
-  const fallbackText = recipientUserId
-    ? `🤙 ${senderName} gave an eyyy to <@${recipientUserId}>!`
-    : `🤙 ${senderName} gave an eyyy to ${recipientName || 'a teammate'}!`;
+  const fallbackText = `🤙 ${senderName} ${verb} ${formatRecipientsForFallback(resolvedRecipients)}!`;
 
   return { text: fallbackText, blocks };
 }

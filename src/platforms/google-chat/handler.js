@@ -1,7 +1,20 @@
 const { buildEyyyCard } = require('./card');
 const { buildRenderActionsDialog } = require('./dialog');
+const {
+  buildLeaderboardCard,
+  buildLeaderboardResponse,
+  buildLeaderboardPrivateResponse,
+} = require('./leaderboard');
+const {
+  parseUserMentions,
+  namesFromAnnotations,
+  resolveRecipientsFromInput,
+  userIdFromGoogleUser,
+} = require('./identity');
 const { getValueByKey } = require('../../shared/values');
-const { recordKudos, DEFAULT_VALUE_KEY } = require('../../shared/kudos');
+const { recordKudosBatch, DEFAULT_VALUE_KEY } = require('../../shared/kudos');
+const { parseSlashCommand, GCHAT_MENTION_REGEX } = require('../../shared/commands');
+const { getReceivedStats, getRecentVerbatims } = require('../../shared/stats');
 
 function handleEventFactory({ submitUrl }) {
   async function handleEvent(rawEvent) {
@@ -9,18 +22,39 @@ function handleEventFactory({ submitUrl }) {
     const payload = chat.appCommandPayload || {};
     const message = payload.message || {};
 
-    if (message.slashCommand || payload.dialogEventType === 'REQUEST_DIALOG') {
-      const mention = (message.annotations || []).find(
-        (a) => a.type === 'USER_MENTION'
+    const isSlashCommand = !!message.slashCommand
+      || payload.dialogEventType === 'REQUEST_DIALOG';
+
+    if (isSlashCommand) {
+      const annotations = message.annotations || [];
+      const argumentText = message.argumentText || '';
+      const parsed = parseSlashCommand(argumentText, {
+        mentionRegex: GCHAT_MENTION_REGEX,
+        extractAll: true,
+      });
+
+      if (parsed.kind === 'leaderboard') {
+        return handleLeaderboard(rawEvent);
+      }
+
+      // Build prefill data from the slash-command annotations + parsed text.
+      const namesMap = namesFromAnnotations(annotations);
+      const recipientUserIds = parsed.recipientIds.map((id) =>
+        id.startsWith('users/') ? id : `users/${id}`
       );
-      const recipientName = mention?.userMention?.user?.displayName || '';
-      const recipientUserId = mention?.userMention?.user?.name || '';
-      return buildRenderActionsDialog({ submitUrl, recipientName, recipientUserId });
+      const recipientNames = recipientUserIds.map((id) => namesMap.get(id) || '');
+
+      return buildRenderActionsDialog({
+        submitUrl,
+        recipientUserIds,
+        recipientNames,
+        prefilledMessage: parsed.message,
+      });
     }
 
     if (chat.type === 'ADDED_TO_SPACE') {
       return {
-        text: "EYYY! 🤙 I'm here to help you hype up your teammates!\n\nUse `/eyy @someone` to give an eyyy to a coworker.",
+        text: "EYYY! 🤙 I'm here to help you hype up your teammates!\n\nUse `/eyy @someone` to give an eyyy to a coworker, or `/eyy leaderboard` to see your stats.",
       };
     }
 
@@ -41,13 +75,42 @@ async function handleSubmit(rawEvent) {
   const formInputs = commonEvent.formInputs || {};
   const getInput = (name) => formInputs[name]?.stringInputs?.value?.[0] || '';
 
-  const recipientName = getInput('recipient') || 'Someone';
+  const recipientText = getInput('recipient') || '';
   const message = getInput('message') || '';
   const rawValueKey = getInput('valueKey') || DEFAULT_VALUE_KEY;
   const valueKey = getValueByKey(rawValueKey) ? rawValueKey : DEFAULT_VALUE_KEY;
 
   const params = commonEvent.parameters || {};
-  const recipientUserId = params.recipientUserId || '';
+  const paramRecipientIds = (params.recipientUserIds || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const paramRecipientNames = (params.recipientNames || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // Recipient resolution priority: any <users/N> tokens in the form input,
+  // else fall back to slash-command params.
+  let recipients;
+  const formMentionIds = parseUserMentions(recipientText);
+  if (formMentionIds.length > 0) {
+    recipients = formMentionIds.map((id, i) => ({
+      id: id.startsWith('users/') ? id : `users/${id}`,
+      name: paramRecipientNames[i] || '',
+      email: '',
+    }));
+  } else if (paramRecipientIds.length > 0) {
+    recipients = paramRecipientIds.map((id, i) => ({
+      id: id.startsWith('users/') ? id : `users/${id}`,
+      name: paramRecipientNames[i] || '',
+      email: '',
+    }));
+  } else {
+    // Last-ditch: treat recipient text as a free-text name. Single recipient,
+    // no user_id. Mirrors the previous behavior so existing flows still work.
+    recipients = [{ id: '', name: recipientText.trim() || 'Someone', email: '' }];
+  }
 
   const user = chat.user || {};
   const senderName = user.displayName || 'Someone';
@@ -56,16 +119,22 @@ async function handleSubmit(rawEvent) {
   const buttonPayload = chat.buttonClickedPayload || {};
   const spaceName = buttonPayload.message?.space?.name || '';
 
-  const { gifUrl } = await recordKudos({
+  const { gifUrl } = await recordKudosBatch({
     platform: 'google-chat',
     sender: { name: senderName, email: senderEmail },
-    recipient: { id: recipientUserId, name: recipientName },
+    recipients,
     message,
     valueKey,
     channel: spaceName,
   });
 
-  const card = buildEyyyCard({ senderName, recipientName, recipientUserId, message, valueKey, gifUrl });
+  const card = buildEyyyCard({
+    senderName,
+    recipients,
+    message,
+    valueKey,
+    gifUrl,
+  });
 
   return {
     hostAppDataAction: {
@@ -78,4 +147,43 @@ async function handleSubmit(rawEvent) {
   };
 }
 
-module.exports = { handleEventFactory, handleSubmit };
+async function handleLeaderboard(rawEvent) {
+  const chat = rawEvent.chat || {};
+  const user = chat.user || {};
+  const userId = userIdFromGoogleUser(user);
+  const userName = user.displayName || 'You';
+  const userEmail = user.email || '';
+
+  let stats;
+  let verbatims;
+  try {
+    [stats, verbatims] = await Promise.all([
+      getReceivedStats({ email: userEmail, userId }),
+      getRecentVerbatims({ email: userEmail, userId }, 5),
+    ]);
+  } catch (err) {
+    console.error('[google-chat] leaderboard query failed:', err.message);
+    return buildLeaderboardPrivateResponse({
+      text: "Couldn't load your stats — try again in a moment.",
+      viewerUserId: userId,
+    });
+  }
+
+  if (stats.total === 0) {
+    return buildLeaderboardPrivateResponse({
+      text: `No eyys received yet, ${userName} — keep being awesome 🤙`,
+      viewerUserId: userId,
+    });
+  }
+
+  const card = await buildLeaderboardCard({
+    senderName: userName,
+    counts: stats.counts,
+    total: stats.total,
+    verbatims,
+  });
+
+  return buildLeaderboardResponse({ message: card });
+}
+
+module.exports = { handleEventFactory, handleSubmit, handleLeaderboard };

@@ -1,27 +1,17 @@
 const { buildEyyyModal, readModalSubmission, CALLBACK_ID } = require('./modal');
 const { buildEyyyBlocks } = require('./message');
-const { recordKudos } = require('../../shared/kudos');
+const { buildLeaderboard, buildEmptyLeaderboardEphemeral } = require('./leaderboard');
+const { recordKudosBatch } = require('../../shared/kudos');
+const { getReceivedStats, getRecentVerbatims } = require('../../shared/stats');
+const { parseSlashCommand, SLACK_MENTION_REGEX } = require('../../shared/commands');
 const { getSlackClient } = require('./client');
 
-const SLACK_USER_MENTION = /<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/;
+const SLACK_USER_MENTION_FIRST = /<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/;
 
 function parsePrefilledUser(text) {
   if (!text) return '';
-  const match = text.match(SLACK_USER_MENTION);
+  const match = text.match(SLACK_USER_MENTION_FIRST);
   return match ? match[1] : '';
-}
-
-async function handleSlashCommand(body) {
-  const triggerId = body.trigger_id;
-  const channelId = body.channel_id || '';
-  const prefilledUserId = parsePrefilledUser(body.text || '');
-
-  const view = buildEyyyModal({ channelId, prefilledUserId });
-
-  const client = getSlackClient();
-  await client.views.open({ trigger_id: triggerId, view });
-
-  return { ok: true };
 }
 
 async function lookupSlackUser(userId) {
@@ -41,46 +31,145 @@ async function lookupSlackUser(userId) {
   }
 }
 
+async function handleSlashCommand(body) {
+  const triggerId = body.trigger_id;
+  const channelId = body.channel_id || '';
+  const text = body.text || '';
+  const responseUrl = body.response_url || '';
+  const userId = body.user_id || '';
+
+  const parsed = parseSlashCommand(text, { mentionRegex: SLACK_MENTION_REGEX });
+
+  if (parsed.kind === 'leaderboard') {
+    setImmediate(() => buildAndPostLeaderboard({ channelId, userId, responseUrl }));
+    return { ok: true };
+  }
+
+  const view = buildEyyyModal({
+    channelId,
+    prefilledUserIds: parsed.recipientIds,
+    prefilledMessage: parsed.message,
+  });
+
+  const client = getSlackClient();
+  await client.views.open({ trigger_id: triggerId, view });
+
+  return { ok: true };
+}
+
+async function buildAndPostLeaderboard({ channelId, userId, responseUrl }) {
+  const invoker = await lookupSlackUser(userId);
+
+  if (!invoker.email) {
+    await sendEphemeral(responseUrl, channelId, userId,
+      "Couldn't load your stats — try again in a moment.");
+    return;
+  }
+
+  const [stats, verbatims] = await Promise.all([
+    getReceivedStats(invoker.email).catch((err) => {
+      console.error('[slack] getReceivedStats failed:', err.message);
+      return { counts: emptyCounts(), total: 0 };
+    }),
+    getRecentVerbatims(invoker.email, 5).catch((err) => {
+      console.error('[slack] getRecentVerbatims failed:', err.message);
+      return [];
+    }),
+  ]);
+
+  if (stats.total === 0) {
+    const ephemeral = buildEmptyLeaderboardEphemeral(invoker.name || 'you');
+    await sendEphemeral(responseUrl, channelId, userId, ephemeral.text);
+    return;
+  }
+
+  const board = await buildLeaderboard({
+    senderName: invoker.name || 'You',
+    counts: stats.counts,
+    total: stats.total,
+    verbatims,
+  });
+
+  try {
+    const client = getSlackClient();
+    await client.chat.postMessage({
+      channel: channelId,
+      text: board.text,
+      blocks: board.blocks,
+    });
+  } catch (err) {
+    console.error('[slack] leaderboard chat.postMessage failed:', err.message);
+    await sendEphemeral(responseUrl, channelId, userId,
+      `Saved your leaderboard but couldn't post here — \`/invite @EYYY\` to this channel.`);
+  }
+}
+
+async function sendEphemeral(responseUrl, channelId, userId, text) {
+  if (responseUrl) {
+    try {
+      const res = await fetch(responseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ response_type: 'ephemeral', text }),
+      });
+      if (res.ok) return;
+    } catch (err) {
+      console.error('[slack] response_url post failed:', err.message);
+    }
+  }
+  try {
+    const client = getSlackClient();
+    await client.chat.postEphemeral({ channel: channelId, user: userId, text });
+  } catch (err) {
+    console.error('[slack] chat.postEphemeral failed:', err.message);
+  }
+}
+
+function emptyCounts() {
+  return { speed: 0, talent: 0, kind: 0, hightech: 0, creative: 0, clear: 0, lead: 0 };
+}
+
 async function handleViewSubmission(payload) {
   const view = payload.view || {};
   if (view.callback_id !== CALLBACK_ID) {
     return { response_action: 'clear' };
   }
 
-  const { recipientUserId, message, valueKey, channelId } = readModalSubmission(view);
+  const { recipientUserIds, message, valueKey, channelId } = readModalSubmission(view);
+
+  if (!recipientUserIds || recipientUserIds.length === 0) {
+    return {
+      response_action: 'errors',
+      errors: { recipient_block: 'Pick at least one teammate.' },
+    };
+  }
 
   const senderId = payload.user?.id || '';
-  const sender = await lookupSlackUser(senderId);
-  const recipient = await lookupSlackUser(recipientUserId);
+  const [sender, ...recipients] = await Promise.all([
+    lookupSlackUser(senderId),
+    ...recipientUserIds.map(lookupSlackUser),
+  ]);
 
-  const { gifUrl } = await recordKudos({
+  const { gifUrl, valueKey: resolvedValueKey } = await recordKudosBatch({
     platform: 'slack',
     sender,
-    recipient,
+    recipients,
     message,
     valueKey,
     channel: channelId,
   });
 
-  // Post the message after acknowledging the submission so we stay under
-  // Slack's 3-second response budget. If chat.postMessage fails, the kudos
-  // is already saved.
   setImmediate(async () => {
     try {
       const client = getSlackClient();
       const { text, blocks } = buildEyyyBlocks({
         senderName: sender.name || 'Someone',
-        recipientUserId: recipient.id,
-        recipientName: recipient.name,
+        recipients: recipients.map((r) => ({ id: r.id, name: r.name })),
         message,
-        valueKey,
+        valueKey: resolvedValueKey,
         gifUrl,
       });
-      await client.chat.postMessage({
-        channel: channelId,
-        text,
-        blocks,
-      });
+      await client.chat.postMessage({ channel: channelId, text, blocks });
     } catch (err) {
       console.error('[slack] chat.postMessage failed:', err.message);
     }
@@ -94,4 +183,5 @@ module.exports = {
   handleViewSubmission,
   parsePrefilledUser,
   lookupSlackUser,
+  buildAndPostLeaderboard,
 };

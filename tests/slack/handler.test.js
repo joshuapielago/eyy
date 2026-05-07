@@ -1,20 +1,36 @@
 jest.mock('../../src/shared/db', () => ({
   saveKudos: jest.fn().mockResolvedValue({ id: 1 }),
+  saveKudosBatch: jest.fn().mockResolvedValue([{ id: 1 }]),
   initDb: jest.fn().mockResolvedValue(),
-  pool: { end: jest.fn() },
+  pool: { end: jest.fn(), query: jest.fn() },
 }));
 jest.mock('../../src/shared/giphy', () => ({
   fetchRandomGif: jest.fn().mockResolvedValue('https://giphy.com/x.gif'),
 }));
+jest.mock('../../src/shared/stats', () => ({
+  getReceivedStats: jest.fn(),
+  getRecentVerbatims: jest.fn(),
+}));
+jest.mock('../../src/shared/quickchart', () => {
+  const actual = jest.requireActual('../../src/shared/quickchart');
+  return {
+    ...actual,
+    probeQuickChart: jest.fn().mockResolvedValue(true),
+  };
+});
 
 const mockViewsOpen = jest.fn().mockResolvedValue({ ok: true });
 const mockChatPostMessage = jest.fn().mockResolvedValue({ ok: true });
+const mockChatPostEphemeral = jest.fn().mockResolvedValue({ ok: true });
 const mockUsersInfo = jest.fn();
 
 jest.mock('../../src/platforms/slack/client', () => ({
   getSlackClient: () => ({
     views: { open: mockViewsOpen },
-    chat: { postMessage: mockChatPostMessage },
+    chat: {
+      postMessage: mockChatPostMessage,
+      postEphemeral: mockChatPostEphemeral,
+    },
     users: { info: mockUsersInfo },
   }),
 }));
@@ -23,9 +39,22 @@ const {
   handleSlashCommand,
   handleViewSubmission,
   parsePrefilledUser,
+  buildAndPostLeaderboard,
 } = require('../../src/platforms/slack/handler');
-const { saveKudos } = require('../../src/shared/db');
+const { saveKudosBatch } = require('../../src/shared/db');
 const { CALLBACK_ID } = require('../../src/platforms/slack/modal');
+const { getReceivedStats, getRecentVerbatims } = require('../../src/shared/stats');
+
+beforeEach(() => {
+  mockUsersInfo.mockImplementation(({ user }) =>
+    Promise.resolve({
+      user: {
+        name: user.toLowerCase(),
+        profile: { real_name: `Real ${user}`, email: `${user}@x.com` },
+      },
+    })
+  );
+});
 
 describe('parsePrefilledUser', () => {
   test('extracts the user id from a Slack mention token', () => {
@@ -39,7 +68,7 @@ describe('parsePrefilledUser', () => {
   });
 });
 
-describe('handleSlashCommand', () => {
+describe('handleSlashCommand — kudos modal flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -48,6 +77,7 @@ describe('handleSlashCommand', () => {
     await handleSlashCommand({
       trigger_id: 'TRIG',
       channel_id: 'C1',
+      user_id: 'U_INVOKER',
       text: '<@U12345|alice> hyped',
     });
     expect(mockViewsOpen).toHaveBeenCalledTimes(1);
@@ -56,24 +86,145 @@ describe('handleSlashCommand', () => {
     expect(call.view.callback_id).toBe(CALLBACK_ID);
     expect(call.view.private_metadata).toBe(JSON.stringify({ channelId: 'C1' }));
     const recipientBlock = call.view.blocks.find((b) => b.block_id === 'recipient_block');
-    expect(recipientBlock.element.initial_user).toBe('U12345');
+    expect(recipientBlock.element.type).toBe('multi_users_select');
+    expect(recipientBlock.element.initial_users).toEqual(['U12345']);
+    const messageBlock = call.view.blocks.find((b) => b.block_id === 'message_block');
+    expect(messageBlock.element.initial_value).toBe('hyped');
+  });
+
+  test('opens the modal with no prefill when text is empty', async () => {
+    await handleSlashCommand({ trigger_id: 'T', channel_id: 'C', user_id: 'U', text: '' });
+    const call = mockViewsOpen.mock.calls[0][0];
+    const recipientBlock = call.view.blocks.find((b) => b.block_id === 'recipient_block');
+    expect(recipientBlock.element.initial_users).toBeUndefined();
+    const messageBlock = call.view.blocks.find((b) => b.block_id === 'message_block');
+    expect(messageBlock.element.initial_value).toBeUndefined();
   });
 });
 
-describe('handleViewSubmission', () => {
+describe('handleSlashCommand — leaderboard subcommand routing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUsersInfo.mockImplementation(({ user }) =>
-      Promise.resolve({
-        user: {
-          name: user.toLowerCase(),
-          profile: { real_name: `Real ${user}`, email: `${user}@x.com` },
-        },
-      })
+  });
+
+  test('does not open the modal when text is "leaderboard"', async () => {
+    getReceivedStats.mockResolvedValue({ counts: emptyCounts(), total: 0 });
+    getRecentVerbatims.mockResolvedValue([]);
+
+    await handleSlashCommand({
+      trigger_id: 'T',
+      channel_id: 'C',
+      user_id: 'U_INV',
+      text: 'leaderboard',
+      response_url: 'https://hooks.slack.com/x',
+    });
+
+    expect(mockViewsOpen).not.toHaveBeenCalled();
+  });
+
+  test('routes "Leaderboard" (case-insensitive)', async () => {
+    getReceivedStats.mockResolvedValue({ counts: emptyCounts(), total: 0 });
+    getRecentVerbatims.mockResolvedValue([]);
+
+    await handleSlashCommand({
+      trigger_id: 'T',
+      channel_id: 'C',
+      user_id: 'U_INV',
+      text: '  Leaderboard  ',
+      response_url: 'https://hooks.slack.com/x',
+    });
+
+    expect(mockViewsOpen).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildAndPostLeaderboard', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+  });
+
+  afterEach(() => {
+    delete global.fetch;
+  });
+
+  test('zero kudos → posts nothing publicly, sends ephemeral', async () => {
+    getReceivedStats.mockResolvedValue({ counts: emptyCounts(), total: 0 });
+    getRecentVerbatims.mockResolvedValue([]);
+
+    await buildAndPostLeaderboard({
+      channelId: 'C42',
+      userId: 'U_INV',
+      responseUrl: 'https://hooks.slack.com/x',
+    });
+
+    expect(mockChatPostMessage).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://hooks.slack.com/x',
+      expect.objectContaining({ method: 'POST' })
     );
   });
 
-  test('records the kudos and acks the modal close', async () => {
+  test('with kudos → posts publicly with leaderboard blocks', async () => {
+    getReceivedStats.mockResolvedValue({
+      counts: { speed: 3, talent: 0, kind: 5, hightech: 0, creative: 1, clear: 0, lead: 2 },
+      total: 11,
+    });
+    getRecentVerbatims.mockResolvedValue([
+      { sender_name: 'A', message: 'm', value_key: 'kind', value_emoji: '💛', platform: 'slack' },
+    ]);
+
+    await buildAndPostLeaderboard({
+      channelId: 'C42',
+      userId: 'U_INV',
+      responseUrl: 'https://hooks.slack.com/x',
+    });
+
+    expect(mockChatPostMessage).toHaveBeenCalledTimes(1);
+    const call = mockChatPostMessage.mock.calls[0][0];
+    expect(call.channel).toBe('C42');
+    expect(call.blocks.find((b) => b.type === 'header')).toBeTruthy();
+  });
+
+  test('falls back to ephemeral when chat.postMessage fails', async () => {
+    getReceivedStats.mockResolvedValue({
+      counts: { speed: 3, talent: 0, kind: 5, hightech: 0, creative: 1, clear: 0, lead: 2 },
+      total: 11,
+    });
+    getRecentVerbatims.mockResolvedValue([]);
+    mockChatPostMessage.mockRejectedValueOnce(new Error('not_in_channel'));
+
+    await buildAndPostLeaderboard({
+      channelId: 'C42',
+      userId: 'U_INV',
+      responseUrl: 'https://hooks.slack.com/x',
+    });
+
+    expect(global.fetch).toHaveBeenCalled();
+    const fetchBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(fetchBody.text).toMatch(/invite @EYYY/i);
+  });
+
+  test('handles missing email gracefully', async () => {
+    mockUsersInfo.mockResolvedValueOnce({ user: { profile: {} } });
+
+    await buildAndPostLeaderboard({
+      channelId: 'C42',
+      userId: 'U_INV',
+      responseUrl: 'https://hooks.slack.com/x',
+    });
+
+    expect(mockChatPostMessage).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalled();
+  });
+});
+
+describe('handleViewSubmission — multi-recipient submit', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('rejects empty recipient list with input validation', async () => {
     const payload = {
       type: 'view_submission',
       user: { id: 'USENDER' },
@@ -82,8 +233,31 @@ describe('handleViewSubmission', () => {
         private_metadata: JSON.stringify({ channelId: 'C42' }),
         state: {
           values: {
-            recipient_block: { recipient_action: { selected_user: 'URECIP' } },
-            message_block: { message_action: { value: 'great work' } },
+            recipient_block: { recipient_action: { selected_users: [] } },
+            message_block: { message_action: { value: 'great' } },
+            value_block: { value_action: { selected_option: { value: 'kind' } } },
+          },
+        },
+      },
+    };
+
+    const ack = await handleViewSubmission(payload);
+    expect(ack.response_action).toBe('errors');
+    expect(ack.errors.recipient_block).toMatch(/teammate/i);
+    expect(saveKudosBatch).not.toHaveBeenCalled();
+  });
+
+  test('saves N rows for N recipients with shared group_id', async () => {
+    const payload = {
+      type: 'view_submission',
+      user: { id: 'USENDER' },
+      view: {
+        callback_id: CALLBACK_ID,
+        private_metadata: JSON.stringify({ channelId: 'C42' }),
+        state: {
+          values: {
+            recipient_block: { recipient_action: { selected_users: ['U1', 'U2', 'U3'] } },
+            message_block: { message_action: { value: 'team win' } },
             value_block: { value_action: { selected_option: { value: 'kind' } } },
           },
         },
@@ -92,23 +266,26 @@ describe('handleViewSubmission', () => {
 
     const ack = await handleViewSubmission(payload);
     expect(ack).toEqual({ response_action: 'clear' });
-    // Drain the deferred postMessage so it doesn't leak into the next test.
     await new Promise((r) => setImmediate(r));
 
-    expect(saveKudos).toHaveBeenCalledWith(expect.objectContaining({
-      platform: 'slack',
-      senderEmail: 'USENDER@x.com',
-      senderName: 'Real USENDER',
-      recipientEmail: 'URECIP@x.com',
-      recipientName: 'Real URECIP',
-      recipientUserId: 'URECIP',
-      message: 'great work',
-      valueKey: 'kind',
-      spaceName: 'C42',
-    }));
+    expect(saveKudosBatch).toHaveBeenCalledTimes(1);
+    const [rows, opts] = saveKudosBatch.mock.calls[0];
+    expect(rows).toHaveLength(3);
+    expect(opts.kudosGroupId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    );
+    expect(rows[0].recipientUserId).toBe('U1');
+    expect(rows[1].recipientUserId).toBe('U2');
+    expect(rows[2].recipientUserId).toBe('U3');
+    rows.forEach((r) => {
+      expect(r.platform).toBe('slack');
+      expect(r.valueKey).toBe('kind');
+      expect(r.message).toBe('team win');
+      expect(r.spaceName).toBe('C42');
+    });
   });
 
-  test('posts the message to the invoking channel after ack (deferred)', async () => {
+  test('posts a single combined message after acking the modal', async () => {
     const payload = {
       type: 'view_submission',
       user: { id: 'USENDER' },
@@ -117,8 +294,8 @@ describe('handleViewSubmission', () => {
         private_metadata: JSON.stringify({ channelId: 'C42' }),
         state: {
           values: {
-            recipient_block: { recipient_action: { selected_user: 'URECIP' } },
-            message_block: { message_action: { value: 'great work' } },
+            recipient_block: { recipient_action: { selected_users: ['U1', 'U2'] } },
+            message_block: { message_action: { value: 'team win' } },
             value_block: { value_action: { selected_option: { value: 'kind' } } },
           },
         },
@@ -126,11 +303,16 @@ describe('handleViewSubmission', () => {
     };
 
     await handleViewSubmission(payload);
-    // setImmediate defers the post; flush the queue.
     await new Promise((r) => setImmediate(r));
+
     expect(mockChatPostMessage).toHaveBeenCalledTimes(1);
     const args = mockChatPostMessage.mock.calls[0][0];
     expect(args.channel).toBe('C42');
-    expect(args.blocks).toBeDefined();
+    expect(args.text).toContain('<@U1>');
+    expect(args.text).toContain('<@U2>');
   });
 });
+
+function emptyCounts() {
+  return { speed: 0, talent: 0, kind: 0, hightech: 0, creative: 0, clear: 0, lead: 0 };
+}

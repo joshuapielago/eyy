@@ -48,4 +48,54 @@ describe('buildEyyyBlocks', () => {
     const result = buildEyyyBlocks({ ...base, gifUrl: null });
     expect(result.blocks.find((b) => b.type === 'image')).toBeUndefined();
   });
+
+  test('renders multi-recipient mention list with plural verb', () => {
+    const result = buildEyyyBlocks({
+      senderName: 'Maria',
+      recipients: [
+        { id: 'U1', name: 'Alice' },
+        { id: 'U2', name: 'Bob' },
+        { id: 'U3', name: 'Carol' },
+      ],
+      message: 'team win',
+      valueKey: 'kind',
+      gifUrl: null,
+    });
+    const section = result.blocks.find((b) => b.type === 'section' && b.text?.text?.includes('gave eyyys'));
+    expect(section.text.text).toContain('<@U1>');
+    expect(section.text.text).toContain('<@U2>');
+    expect(section.text.text).toContain('<@U3>');
+    expect(section.text.text).toContain('gave eyyys to');
+    expect(result.text).toContain('<@U1>');
+    expect(result.text).toContain('<@U2>');
+    expect(result.text).toContain('<@U3>');
+  });
+
+  test('multi-recipient with one recipient still uses singular verb', () => {
+    const result = buildEyyyBlocks({
+      senderName: 'Maria',
+      recipients: [{ id: 'U1', name: 'Alice' }],
+      message: 'good',
+      valueKey: 'kind',
+      gifUrl: null,
+    });
+    const section = result.blocks.find((b) => b.type === 'section' && b.text?.text?.includes('gave an eyyy'));
+    expect(section.text.text).toContain('gave an eyyy to');
+  });
+
+  test('falls back to recipient name when one of multiple has no id', () => {
+    const result = buildEyyyBlocks({
+      senderName: 'Maria',
+      recipients: [
+        { id: 'U1', name: 'Alice' },
+        { id: '', name: 'Bob' },
+      ],
+      message: 'good',
+      valueKey: 'kind',
+      gifUrl: null,
+    });
+    const section = result.blocks.find((b) => b.type === 'section' && b.text?.text?.includes('gave eyyys'));
+    expect(section.text.text).toContain('<@U1>');
+    expect(section.text.text).toContain('*Bob*');
+  });
 });

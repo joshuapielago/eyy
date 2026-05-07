@@ -5,9 +5,17 @@ A peer recognition app for LOKAL. Give your teammates a shoutout tied to a compa
 ## How it works
 
 1. A user types `/eyy @someone` in Google Chat or Slack.
-2. A dialog/modal opens to compose the recognition — pick the recipient, write a message, choose a LOKAL value.
+2. A dialog/modal opens to compose the recognition — pick one or more recipients, write a message, choose a LOKAL value.
 3. The app posts a rich card/message to the channel with the kudos, the value tagline, and a random GIF.
-4. Every recognition is saved to PostgreSQL for posterity (tagged with the originating platform).
+4. Every recognition is saved to PostgreSQL for posterity (tagged with the originating platform and a shared group ID for multi-recipient batches).
+
+### Slash command flavors
+
+- `/eyy` — opens an empty modal.
+- `/eyy @ky` — opens the modal with `@ky` pre-selected.
+- `/eyy @ky thanks for the demo` — opens the modal with `@ky` pre-selected and the message field pre-filled.
+- `/eyy leaderboard` — posts a personal leaderboard: a radar chart of the kudos you've received across the seven LOKAL values, plus the most recent verbatim shoutouts. Posts publicly in the channel; if you have zero kudos yet, it sends a private "no eyys yet" message instead.
+- Multi-recipient: in the modal, pick multiple teammates from the recipient field — one combined kudos message tagging everyone, with one row per recipient written to the database (sharing a `kudos_group_id`).
 
 ## LOKAL Values
 
