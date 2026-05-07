@@ -12,6 +12,7 @@ jest.mock('../../src/shared/giphy', () => ({
 jest.mock('../../src/shared/stats', () => ({
   getReceivedStats: jest.fn(),
   getRecentVerbatims: jest.fn(),
+  getTeamLeaderboard: jest.fn(),
 }));
 
 jest.mock('../../src/shared/quickchart', () => {
@@ -25,7 +26,11 @@ jest.mock('../../src/shared/quickchart', () => {
 const { handleEventFactory } = require('../../src/platforms/google-chat/handler');
 const { saveKudosBatch } = require('../../src/shared/db');
 const { fetchRandomGif } = require('../../src/shared/giphy');
-const { getReceivedStats, getRecentVerbatims } = require('../../src/shared/stats');
+const {
+  getReceivedStats,
+  getRecentVerbatims,
+  getTeamLeaderboard,
+} = require('../../src/shared/stats');
 
 const handleEvent = handleEventFactory({ submitUrl: 'https://example.test/google-chat' });
 
@@ -135,46 +140,15 @@ describe('google-chat handleEvent — slash command (kudos)', () => {
   });
 });
 
-describe('google-chat handleEvent — leaderboard subcommand', () => {
+describe('google-chat handleEvent — /eyy leaderboard (team view)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test('routes "leaderboard" to a leaderboard response (private when zero)', async () => {
-    getReceivedStats.mockResolvedValue({
-      counts: emptyCounts(),
-      total: 0,
-    });
-    getRecentVerbatims.mockResolvedValue([]);
-
-    const event = {
-      commonEventObject: { hostApp: 'CHAT' },
-      chat: {
-        user: { displayName: 'Daisy', email: 'd@x.com', name: 'users/D1' },
-        appCommandPayload: {
-          message: {
-            slashCommand: { commandId: 1 },
-            argumentText: 'leaderboard',
-            annotations: [],
-          },
-          dialogEventType: 'REQUEST_DIALOG',
-        },
-      },
-    };
-
-    const result = await handleEvent(event);
-    const msg = result.hostAppDataAction.chatDataAction.createMessageAction.message;
-    expect(msg.text).toMatch(/no eyys/i);
-    expect(msg.privateMessageViewer).toEqual({ name: 'users/D1' });
-  });
-
-  test('routes "leaderboard" to a public card response when stats exist', async () => {
-    getReceivedStats.mockResolvedValue({
-      counts: { speed: 3, talent: 0, kind: 5, hightech: 0, creative: 1, clear: 0, lead: 2 },
-      total: 11,
-    });
-    getRecentVerbatims.mockResolvedValue([
-      { sender_name: 'A', message: 'm', value_key: 'kind', value_emoji: '💛', platform: 'slack' },
+  test('routes "leaderboard" to a public team leaderboard card', async () => {
+    getTeamLeaderboard.mockResolvedValue([
+      { identityKey: 'a', name: 'Alice', userId: 'users/A', email: 'a@x.com', total: 10, topValueEmoji: '💛', topValueName: 'Kind by Default', topValueKey: 'kind' },
+      { identityKey: 'b', name: 'Bob', userId: 'users/B', email: 'b@x.com', total: 5, topValueEmoji: '⚡', topValueName: 'Speed Is Our Advantage', topValueKey: 'speed' },
     ]);
 
     const event = {
@@ -195,12 +169,42 @@ describe('google-chat handleEvent — leaderboard subcommand', () => {
     const result = await handleEvent(event);
     const msg = result.hostAppDataAction.chatDataAction.createMessageAction.message;
     expect(msg.privateMessageViewer).toBeUndefined();
-    expect(msg.cardsV2[0].card.header.title).toContain('Daisy');
+    expect(msg.cardsV2[0].card.header.title).toMatch(/leaderboard/i);
+    const widgetText = JSON.stringify(msg.cardsV2[0].card.sections);
+    // Google Chat <users/N> tokens render as @display name natively, so
+    // the mention IDs (not the literal display names) appear in the card.
+    expect(widgetText).toContain('users/A');
+    expect(widgetText).toContain('users/B');
+    expect(widgetText).toContain('Kind by Default');
   });
 
-  test('case-insensitive leaderboard routing', async () => {
-    getReceivedStats.mockResolvedValue({ counts: emptyCounts(), total: 0 });
-    getRecentVerbatims.mockResolvedValue([]);
+  test('empty team leaderboard → friendly empty state, still public', async () => {
+    getTeamLeaderboard.mockResolvedValue([]);
+
+    const event = {
+      commonEventObject: { hostApp: 'CHAT' },
+      chat: {
+        user: { displayName: 'Daisy', email: 'd@x.com', name: 'users/D1' },
+        appCommandPayload: {
+          message: {
+            slashCommand: { commandId: 1 },
+            argumentText: 'leaderboard',
+            annotations: [],
+          },
+          dialogEventType: 'REQUEST_DIALOG',
+        },
+      },
+    };
+
+    const result = await handleEvent(event);
+    const msg = result.hostAppDataAction.chatDataAction.createMessageAction.message;
+    expect(msg.privateMessageViewer).toBeUndefined();
+    const widgetText = JSON.stringify(msg.cardsV2[0].card.sections);
+    expect(widgetText).toMatch(/No eyys logged yet/i);
+  });
+
+  test('case-insensitive routing', async () => {
+    getTeamLeaderboard.mockResolvedValue([]);
 
     const event = {
       commonEventObject: { hostApp: 'CHAT' },
@@ -219,6 +223,119 @@ describe('google-chat handleEvent — leaderboard subcommand', () => {
 
     const result = await handleEvent(event);
     expect(result.hostAppDataAction).toBeDefined();
+    expect(getTeamLeaderboard).toHaveBeenCalled();
+  });
+
+  test('team leaderboard query failure → private error to invoker', async () => {
+    getTeamLeaderboard.mockRejectedValue(new Error('connection refused'));
+
+    const event = {
+      commonEventObject: { hostApp: 'CHAT' },
+      chat: {
+        user: { displayName: 'Daisy', email: 'd@x.com', name: 'users/D1' },
+        appCommandPayload: {
+          message: {
+            slashCommand: { commandId: 1 },
+            argumentText: 'leaderboard',
+            annotations: [],
+          },
+          dialogEventType: 'REQUEST_DIALOG',
+        },
+      },
+    };
+
+    const result = await handleEvent(event);
+    const msg = result.hostAppDataAction.chatDataAction.createMessageAction.message;
+    expect(msg.text).toMatch(/couldn't load/i);
+    expect(msg.privateMessageViewer).toEqual({ name: 'users/D1' });
+  });
+});
+
+describe('google-chat handleEvent — /eyy me (personal radar)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('routes "me" to a personal radar response (private when zero)', async () => {
+    getReceivedStats.mockResolvedValue({
+      counts: emptyCounts(),
+      total: 0,
+    });
+    getRecentVerbatims.mockResolvedValue([]);
+
+    const event = {
+      commonEventObject: { hostApp: 'CHAT' },
+      chat: {
+        user: { displayName: 'Daisy', email: 'd@x.com', name: 'users/D1' },
+        appCommandPayload: {
+          message: {
+            slashCommand: { commandId: 1 },
+            argumentText: 'me',
+            annotations: [],
+          },
+          dialogEventType: 'REQUEST_DIALOG',
+        },
+      },
+    };
+
+    const result = await handleEvent(event);
+    const msg = result.hostAppDataAction.chatDataAction.createMessageAction.message;
+    expect(msg.text).toMatch(/no eyys/i);
+    expect(msg.privateMessageViewer).toEqual({ name: 'users/D1' });
+  });
+
+  test('routes "me" to a public personal radar when stats exist', async () => {
+    getReceivedStats.mockResolvedValue({
+      counts: { speed: 3, talent: 0, kind: 5, hightech: 0, creative: 1, clear: 0, lead: 2 },
+      total: 11,
+    });
+    getRecentVerbatims.mockResolvedValue([
+      { sender_name: 'A', message: 'm', value_key: 'kind', value_emoji: '💛', platform: 'slack' },
+    ]);
+
+    const event = {
+      commonEventObject: { hostApp: 'CHAT' },
+      chat: {
+        user: { displayName: 'Daisy', email: 'd@x.com', name: 'users/D1' },
+        appCommandPayload: {
+          message: {
+            slashCommand: { commandId: 1 },
+            argumentText: 'me',
+            annotations: [],
+          },
+          dialogEventType: 'REQUEST_DIALOG',
+        },
+      },
+    };
+
+    const result = await handleEvent(event);
+    const msg = result.hostAppDataAction.chatDataAction.createMessageAction.message;
+    expect(msg.privateMessageViewer).toBeUndefined();
+    expect(msg.cardsV2[0].card.header.title).toContain('Daisy');
+  });
+
+  test('"stats" alias also routes to personal radar', async () => {
+    getReceivedStats.mockResolvedValue({ counts: emptyCounts(), total: 0 });
+    getRecentVerbatims.mockResolvedValue([]);
+
+    const event = {
+      commonEventObject: { hostApp: 'CHAT' },
+      chat: {
+        user: { displayName: 'Daisy', email: 'd@x.com' },
+        appCommandPayload: {
+          message: {
+            slashCommand: { commandId: 1 },
+            argumentText: 'stats',
+            annotations: [],
+          },
+          dialogEventType: 'REQUEST_DIALOG',
+        },
+      },
+    };
+
+    const result = await handleEvent(event);
+    expect(result.hostAppDataAction).toBeDefined();
+    expect(getReceivedStats).toHaveBeenCalled();
   });
 
   test('stats query failure → private "Couldn\'t load" message, NOT empty state', async () => {
@@ -232,7 +349,7 @@ describe('google-chat handleEvent — leaderboard subcommand', () => {
         appCommandPayload: {
           message: {
             slashCommand: { commandId: 1 },
-            argumentText: 'leaderboard',
+            argumentText: 'me',
             annotations: [],
           },
           dialogEventType: 'REQUEST_DIALOG',
@@ -263,7 +380,7 @@ describe('google-chat handleEvent — leaderboard subcommand', () => {
         appCommandPayload: {
           message: {
             slashCommand: { commandId: 1 },
-            argumentText: 'leaderboard',
+            argumentText: 'me',
             annotations: [],
           },
           dialogEventType: 'REQUEST_DIALOG',
@@ -290,7 +407,7 @@ describe('google-chat handleEvent — leaderboard subcommand', () => {
         appCommandPayload: {
           message: {
             slashCommand: { commandId: 1 },
-            argumentText: 'leaderboard',
+            argumentText: 'me',
             annotations: [],
           },
           dialogEventType: 'REQUEST_DIALOG',

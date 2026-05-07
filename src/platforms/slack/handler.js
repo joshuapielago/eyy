@@ -1,8 +1,16 @@
 const { buildEyyyModal, readModalSubmission, CALLBACK_ID } = require('./modal');
 const { buildEyyyBlocks } = require('./message');
-const { buildLeaderboard, buildEmptyLeaderboardEphemeral } = require('./leaderboard');
+const {
+  buildLeaderboard,
+  buildEmptyLeaderboardEphemeral,
+  buildTeamLeaderboard,
+} = require('./leaderboard');
 const { recordKudosBatch } = require('../../shared/kudos');
-const { getReceivedStats, getRecentVerbatims } = require('../../shared/stats');
+const {
+  getReceivedStats,
+  getRecentVerbatims,
+  getTeamLeaderboard,
+} = require('../../shared/stats');
 const { parseSlashCommand, SLACK_MENTION_REGEX } = require('../../shared/commands');
 const { getSlackClient } = require('./client');
 
@@ -41,6 +49,11 @@ async function handleSlashCommand(body) {
   const parsed = parseSlashCommand(text, { mentionRegex: SLACK_MENTION_REGEX });
 
   if (parsed.kind === 'leaderboard') {
+    setImmediate(() => buildAndPostTeamLeaderboard({ channelId, userId, responseUrl }));
+    return { ok: true };
+  }
+
+  if (parsed.kind === 'me') {
     setImmediate(() => buildAndPostLeaderboard({ channelId, userId, responseUrl }));
     return { ok: true };
   }
@@ -108,6 +121,34 @@ async function buildAndPostLeaderboard({ channelId, userId, responseUrl }) {
     console.error('[slack] leaderboard chat.postMessage failed:', err.message);
     await sendEphemeral(responseUrl, channelId, userId,
       `Saved your leaderboard but couldn't post here — \`/invite @EYYY\` to this channel.`);
+  }
+}
+
+async function buildAndPostTeamLeaderboard({ channelId, userId, responseUrl }) {
+  let entries;
+  try {
+    entries = await getTeamLeaderboard({ limit: 10 });
+  } catch (err) {
+    console.error('[slack] getTeamLeaderboard failed:', err.message);
+    await sendEphemeral(responseUrl, channelId, userId,
+      "Couldn't load the team leaderboard — try again in a moment.");
+    return;
+  }
+
+  const total = entries.reduce((acc, e) => acc + e.total, 0);
+  const board = buildTeamLeaderboard({ entries, total });
+
+  try {
+    const client = getSlackClient();
+    await client.chat.postMessage({
+      channel: channelId,
+      text: board.text,
+      blocks: board.blocks,
+    });
+  } catch (err) {
+    console.error('[slack] team leaderboard chat.postMessage failed:', err.message);
+    await sendEphemeral(responseUrl, channelId, userId,
+      "Couldn't post the leaderboard here — `/invite @EYYY` to this channel.");
   }
 }
 
@@ -191,4 +232,5 @@ module.exports = {
   parsePrefilledUser,
   lookupSlackUser,
   buildAndPostLeaderboard,
+  buildAndPostTeamLeaderboard,
 };

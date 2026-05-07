@@ -3,7 +3,11 @@ jest.mock('../../src/shared/db', () => ({
 }));
 
 const { pool } = require('../../src/shared/db');
-const { getReceivedStats, getRecentVerbatims } = require('../../src/shared/stats');
+const {
+  getReceivedStats,
+  getRecentVerbatims,
+  getTeamLeaderboard,
+} = require('../../src/shared/stats');
 
 describe('getReceivedStats', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -161,5 +165,78 @@ describe('getRecentVerbatims', () => {
     const [sql, params] = pool.query.mock.calls[0];
     expect(sql).toMatch(/recipient_user_id = \$1/);
     expect(params).toEqual(['users/abc', 3]);
+  });
+});
+
+describe('getTeamLeaderboard', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns ranked entries with name, total, top value', async () => {
+    pool.query.mockResolvedValueOnce({
+      rows: [
+        {
+          identity_key: 'alice@x.com',
+          total_n: '12',
+          recipient_name: 'Alice',
+          recipient_email: 'alice@x.com',
+          recipient_user_id: 'UA',
+          top_value: 'kind',
+        },
+        {
+          identity_key: 'bob@x.com',
+          total_n: '7',
+          recipient_name: 'Bob',
+          recipient_email: 'bob@x.com',
+          recipient_user_id: 'UB',
+          top_value: 'speed',
+        },
+      ],
+    });
+
+    const result = await getTeamLeaderboard({ limit: 10 });
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({
+      name: 'Alice',
+      total: 12,
+      topValueKey: 'kind',
+      topValueEmoji: '💛',
+      topValueName: 'Kind by Default',
+    });
+    expect(result[1].name).toBe('Bob');
+  });
+
+  test('clamps limit to a sane range', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    await getTeamLeaderboard({ limit: 9999 });
+    const [, params] = pool.query.mock.calls[0];
+    expect(params[0]).toBeLessThanOrEqual(50);
+  });
+
+  test('default limit is 10', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    await getTeamLeaderboard();
+    expect(pool.query.mock.calls[0][1][0]).toBe(10);
+  });
+
+  test('returns empty array when no rows', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    const result = await getTeamLeaderboard({ limit: 5 });
+    expect(result).toEqual([]);
+  });
+
+  test('handles missing top_value gracefully', async () => {
+    pool.query.mockResolvedValueOnce({
+      rows: [{
+        identity_key: 'x',
+        total_n: '1',
+        recipient_name: 'X',
+        recipient_email: '',
+        recipient_user_id: 'UX',
+        top_value: null,
+      }],
+    });
+    const result = await getTeamLeaderboard({ limit: 5 });
+    expect(result[0].topValueKey).toBeNull();
+    expect(result[0].topValueEmoji).toBe('');
   });
 });

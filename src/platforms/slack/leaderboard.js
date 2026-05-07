@@ -81,8 +81,74 @@ function buildEmptyLeaderboardEphemeral(senderName) {
   };
 }
 
+function medal(rank) {
+  if (rank === 1) return ':first_place_medal:';
+  if (rank === 2) return ':second_place_medal:';
+  if (rank === 3) return ':third_place_medal:';
+  return `*${rank}.*`;
+}
+
+function formatLeaderName(entry) {
+  if (entry.userId && /^[UW][A-Z0-9]+$/.test(entry.userId)) {
+    return `<@${entry.userId}>`;
+  }
+  return `*${escapeSlackMrkdwn(entry.name || 'Someone')}*`;
+}
+
+function buildTeamLeaderboard({ entries = [], total = 0 }) {
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: 'EYYY leaderboard 🤙', emoji: true },
+    },
+  ];
+
+  if (entries.length === 0) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: "No eyys logged yet — be the first to give one with `/eyy @teammate`!",
+      },
+    });
+    return { text: 'EYYY leaderboard — no eyys yet.', blocks };
+  }
+
+  blocks.push({
+    type: 'context',
+    elements: [
+      {
+        type: 'mrkdwn',
+        text: `Top ${entries.length} of ${total} total eyys given so far.`,
+      },
+    ],
+  });
+  blocks.push({ type: 'divider' });
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const rank = i + 1;
+    const topValue = entry.topValueEmoji
+      ? ` · ${entry.topValueEmoji} ${escapeSlackMrkdwn(entry.topValueName)}`
+      : '';
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `${medal(rank)}  ${formatLeaderName(entry)}  ·  *${entry.total}* eyy${entry.total === 1 ? '' : 's'}${topValue}`,
+      },
+    });
+  }
+
+  return {
+    text: `EYYY leaderboard — top ${entries.length} of ${total} eyys given.`,
+    blocks,
+  };
+}
+
 module.exports = {
   buildLeaderboard,
   buildEmptyLeaderboardEphemeral,
+  buildTeamLeaderboard,
   formatVerbatim,
 };

@@ -4,6 +4,7 @@ const {
   buildLeaderboardCard,
   buildLeaderboardResponse,
   buildLeaderboardPrivateResponse,
+  buildTeamLeaderboardCard,
 } = require('./leaderboard');
 const {
   parseUserMentions,
@@ -14,7 +15,11 @@ const {
 const { getValueByKey } = require('../../shared/values');
 const { recordKudosBatch, DEFAULT_VALUE_KEY } = require('../../shared/kudos');
 const { parseSlashCommand, GCHAT_MENTION_REGEX } = require('../../shared/commands');
-const { getReceivedStats, getRecentVerbatims } = require('../../shared/stats');
+const {
+  getReceivedStats,
+  getRecentVerbatims,
+  getTeamLeaderboard,
+} = require('../../shared/stats');
 
 function handleEventFactory({ submitUrl }) {
   async function handleEvent(rawEvent) {
@@ -34,6 +39,10 @@ function handleEventFactory({ submitUrl }) {
       });
 
       if (parsed.kind === 'leaderboard') {
+        return handleTeamLeaderboard(rawEvent);
+      }
+
+      if (parsed.kind === 'me') {
         return handleLeaderboard(rawEvent);
       }
 
@@ -190,4 +199,30 @@ async function handleLeaderboard(rawEvent) {
   return buildLeaderboardResponse({ message: card });
 }
 
-module.exports = { handleEventFactory, handleSubmit, handleLeaderboard };
+async function handleTeamLeaderboard(rawEvent) {
+  const chat = rawEvent.chat || {};
+  const userId = userIdFromGoogleUser(chat.user || {});
+
+  let entries;
+  try {
+    entries = await getTeamLeaderboard({ limit: 10 });
+  } catch (err) {
+    console.error('[google-chat] getTeamLeaderboard failed:', err.message);
+    return buildLeaderboardPrivateResponse({
+      text: "Couldn't load the team leaderboard — try again in a moment.",
+      viewerUserId: userId,
+    });
+  }
+
+  const total = entries.reduce((acc, e) => acc + e.total, 0);
+  const card = buildTeamLeaderboardCard({ entries, total });
+
+  return buildLeaderboardResponse({ message: card });
+}
+
+module.exports = {
+  handleEventFactory,
+  handleSubmit,
+  handleLeaderboard,
+  handleTeamLeaderboard,
+};

@@ -100,8 +100,73 @@ function buildLeaderboardPrivateResponse({ text, viewerUserId }) {
   };
 }
 
+function medalGchat(rank) {
+  if (rank === 1) return '🥇';
+  if (rank === 2) return '🥈';
+  if (rank === 3) return '🥉';
+  return `<b>${rank}.</b>`;
+}
+
+function formatLeaderNameGchat(entry) {
+  if (entry.userId && entry.userId.startsWith('users/')) {
+    return `<${entry.userId}>`;
+  }
+  return `<b>${escapeHtml(entry.name || 'Someone')}</b>`;
+}
+
+function buildTeamLeaderboardCard({ entries = [], total = 0 }) {
+  const widgets = [];
+
+  if (entries.length === 0) {
+    widgets.push({
+      textParagraph: {
+        text: 'No eyys logged yet — be the first to give one with <b>/eyy @teammate</b>!',
+      },
+    });
+  } else {
+    widgets.push({
+      textParagraph: {
+        text: `Top ${entries.length} of ${total} total eyys given so far.`,
+      },
+    });
+    widgets.push({ divider: {} });
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const rank = i + 1;
+      const topValue = entry.topValueEmoji
+        ? ` · ${entry.topValueEmoji} ${escapeHtml(entry.topValueName)}`
+        : '';
+      widgets.push({
+        textParagraph: {
+          text: `${medalGchat(rank)} ${formatLeaderNameGchat(entry)} · <b>${entry.total}</b> eyy${entry.total === 1 ? '' : 's'}${topValue}`,
+        },
+      });
+    }
+  }
+
+  return {
+    text: entries.length === 0
+      ? 'EYYY leaderboard — no eyys yet.'
+      : `EYYY leaderboard — top ${entries.length} of ${total} eyys given.`,
+    cardsV2: [
+      {
+        cardId: 'eyyyTeamLeaderboard',
+        card: {
+          header: {
+            title: 'EYYY leaderboard 🤙',
+            subtitle: 'Who got hyped the most',
+            imageType: 'CIRCLE',
+          },
+          sections: [{ widgets }],
+        },
+      },
+    ],
+  };
+}
+
 module.exports = {
   buildLeaderboardCard,
   buildLeaderboardResponse,
   buildLeaderboardPrivateResponse,
+  buildTeamLeaderboardCard,
 };

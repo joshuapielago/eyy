@@ -90,4 +90,81 @@ async function getRecentVerbatims(identity, limit = 5) {
   });
 }
 
-module.exports = { getReceivedStats, getRecentVerbatims };
+async function getTeamLeaderboard({ limit = 10 } = {}) {
+  // Top N recipients by total kudos count, all-time, both platforms combined.
+  // Identity_key coalesces email > user_id > name so Slack and Google Chat
+  // rows for the same person merge when they share an email but stay separate
+  // when only one identity field is populated.
+  const safeLimit = Math.max(1, Math.min(50, Math.floor(limit) || 10));
+
+  const { rows } = await pool.query(
+    `WITH unified AS (
+       SELECT
+         CASE
+           WHEN recipient_email <> '' THEN recipient_email
+           WHEN recipient_user_id <> '' THEN recipient_user_id
+           ELSE recipient_name
+         END AS identity_key,
+         recipient_name,
+         recipient_email,
+         recipient_user_id,
+         value_key
+       FROM kudos
+       WHERE recipient_email <> '' OR recipient_user_id <> '' OR recipient_name <> ''
+     ),
+     totals AS (
+       SELECT identity_key, COUNT(*) AS total_n
+       FROM unified
+       GROUP BY identity_key
+       ORDER BY total_n DESC
+       LIMIT $1
+     ),
+     by_value AS (
+       SELECT
+         u.identity_key,
+         u.value_key,
+         COUNT(*) AS n,
+         ROW_NUMBER() OVER (PARTITION BY u.identity_key ORDER BY COUNT(*) DESC) AS rn
+       FROM unified u
+       WHERE u.identity_key IN (SELECT identity_key FROM totals)
+       GROUP BY u.identity_key, u.value_key
+     ),
+     names AS (
+       SELECT DISTINCT ON (identity_key)
+         identity_key,
+         recipient_name,
+         recipient_email,
+         recipient_user_id
+       FROM unified
+       WHERE identity_key IN (SELECT identity_key FROM totals)
+         AND recipient_name <> ''
+     )
+     SELECT
+       t.identity_key,
+       t.total_n,
+       n.recipient_name,
+       n.recipient_email,
+       n.recipient_user_id,
+       (SELECT value_key FROM by_value WHERE identity_key = t.identity_key AND rn = 1) AS top_value
+     FROM totals t
+     LEFT JOIN names n ON n.identity_key = t.identity_key
+     ORDER BY t.total_n DESC`,
+    [safeLimit]
+  );
+
+  return rows.map((r) => {
+    const value = VALUES[r.top_value];
+    return {
+      identityKey: r.identity_key,
+      name: r.recipient_name || r.identity_key,
+      email: r.recipient_email || '',
+      userId: r.recipient_user_id || '',
+      total: Number(r.total_n) || 0,
+      topValueKey: r.top_value || null,
+      topValueEmoji: value?.emoji || '',
+      topValueName: value?.name || '',
+    };
+  });
+}
+
+module.exports = { getReceivedStats, getRecentVerbatims, getTeamLeaderboard };

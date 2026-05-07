@@ -2,6 +2,7 @@ const SLACK_MENTION_REGEX = /<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g;
 const GCHAT_MENTION_REGEX = /<users\/([^>]+)>/g;
 
 const LEADERBOARD_TOKEN = /^leaderboard$/i;
+const ME_TOKEN = /^(me|stats)$/i;
 const MAX_MESSAGE_LENGTH = 3000;
 const ELLIPSIS = '…';
 
@@ -14,6 +15,10 @@ function parseSlashCommand(text, { mentionRegex, extractAll = false } = {}) {
 
   if (LEADERBOARD_TOKEN.test(trimmed)) {
     return { kind: 'leaderboard' };
+  }
+
+  if (ME_TOKEN.test(trimmed)) {
+    return { kind: 'me' };
   }
 
   if (!mentionRegex) {

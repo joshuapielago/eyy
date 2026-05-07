@@ -1,4 +1,8 @@
-const { buildLeaderboard, buildEmptyLeaderboardEphemeral } = require('../../src/platforms/slack/leaderboard');
+const {
+  buildLeaderboard,
+  buildEmptyLeaderboardEphemeral,
+  buildTeamLeaderboard,
+} = require('../../src/platforms/slack/leaderboard');
 
 const sampleCounts = { speed: 3, talent: 1, kind: 8, hightech: 2, creative: 5, clear: 0, lead: 4 };
 const sampleVerbatims = [
@@ -139,5 +143,73 @@ describe('buildEmptyLeaderboardEphemeral', () => {
     const out = buildEmptyLeaderboardEphemeral();
     expect(out.response_type).toBe('ephemeral');
     expect(out.text).toMatch(/keep being awesome/i);
+  });
+});
+
+describe('buildTeamLeaderboard', () => {
+  const entries = [
+    { identityKey: 'alice@x.com', name: 'Alice', userId: 'UA', email: 'alice@x.com', total: 12, topValueEmoji: '💛', topValueName: 'Kind by Default', topValueKey: 'kind' },
+    { identityKey: 'bob@x.com', name: 'Bob', userId: 'UB', email: 'bob@x.com', total: 7, topValueEmoji: '⚡', topValueName: 'Speed Is Our Advantage', topValueKey: 'speed' },
+    { identityKey: 'carol@x.com', name: 'Carol', userId: 'UC', email: 'carol@x.com', total: 5, topValueEmoji: '🎨', topValueName: 'Radically Creative', topValueKey: 'creative' },
+  ];
+
+  test('renders a header, total summary, and one row per entry', () => {
+    const out = buildTeamLeaderboard({ entries, total: 24 });
+    expect(out.blocks.find((b) => b.type === 'header').text.text).toMatch(/leaderboard/i);
+    const ctx = out.blocks.find((b) => b.type === 'context');
+    expect(ctx.elements[0].text).toContain('24');
+    const rows = out.blocks.filter(
+      (b) => b.type === 'section' && b.text?.text?.includes('eyy')
+    );
+    expect(rows).toHaveLength(3);
+  });
+
+  test('uses Slack <@U…> mention format when userId is a Slack user ID', () => {
+    const out = buildTeamLeaderboard({ entries, total: 24 });
+    const aliceRow = out.blocks.find(
+      (b) => b.type === 'section' && b.text?.text?.includes('UA')
+    );
+    expect(aliceRow.text.text).toContain('<@UA>');
+  });
+
+  test('falls back to bold name when userId is not a Slack ID', () => {
+    const gchatEntries = [
+      { identityKey: 'x', name: 'GChatUser', userId: 'users/123', email: '', total: 3, topValueEmoji: '⚡', topValueName: 'Speed Is Our Advantage', topValueKey: 'speed' },
+    ];
+    const out = buildTeamLeaderboard({ entries: gchatEntries, total: 3 });
+    const row = out.blocks.find((b) => b.type === 'section' && b.text?.text?.includes('eyy'));
+    expect(row.text.text).toContain('*GChatUser*');
+    expect(row.text.text).not.toContain('<@users/');
+  });
+
+  test('shows medal emojis for top 3, then numbered ranks', () => {
+    const fiveEntries = [
+      ...entries,
+      { identityKey: 'd', name: 'D', userId: 'UD', email: '', total: 4, topValueEmoji: '', topValueName: '', topValueKey: null },
+      { identityKey: 'e', name: 'E', userId: 'UE', email: '', total: 3, topValueEmoji: '', topValueName: '', topValueKey: null },
+    ];
+    const out = buildTeamLeaderboard({ entries: fiveEntries, total: 31 });
+    const text = JSON.stringify(out.blocks);
+    expect(text).toContain(':first_place_medal:');
+    expect(text).toContain(':second_place_medal:');
+    expect(text).toContain(':third_place_medal:');
+    expect(text).toContain('*4.*');
+    expect(text).toContain('*5.*');
+  });
+
+  test('empty entries → friendly empty state, NOT the personal "no eyys yet" message', () => {
+    const out = buildTeamLeaderboard({ entries: [], total: 0 });
+    const empty = out.blocks.find(
+      (b) => b.type === 'section' && b.text?.text?.includes('No eyys logged yet')
+    );
+    expect(empty).toBeDefined();
+    expect(out.text).toMatch(/no eyys yet/i);
+  });
+
+  test('singular vs plural eyy/eyys', () => {
+    const oneEntry = [{ identityKey: 'x', name: 'X', userId: 'UX', email: '', total: 1, topValueEmoji: '', topValueName: '', topValueKey: null }];
+    const out = buildTeamLeaderboard({ entries: oneEntry, total: 1 });
+    const row = out.blocks.find((b) => b.type === 'section' && b.text?.text?.includes('eyy'));
+    expect(row.text.text).toMatch(/\*1\* eyy(?!s)/);
   });
 });

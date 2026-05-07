@@ -36,6 +36,25 @@ describe('parseSlashCommand — Slack mention syntax', () => {
     expect(parseSlashCommand('  leaderboard  ', opts)).toEqual({ kind: 'leaderboard' });
   });
 
+  test('"me" routes to personal stats', () => {
+    expect(parseSlashCommand('me', opts)).toEqual({ kind: 'me' });
+    expect(parseSlashCommand('Me', opts)).toEqual({ kind: 'me' });
+    expect(parseSlashCommand('  me  ', opts)).toEqual({ kind: 'me' });
+  });
+
+  test('"stats" routes to personal stats (alias)', () => {
+    expect(parseSlashCommand('stats', opts)).toEqual({ kind: 'me' });
+    expect(parseSlashCommand('Stats', opts)).toEqual({ kind: 'me' });
+  });
+
+  test('"meet me there" is NOT a personal-stats subcommand', () => {
+    expect(parseSlashCommand('meet me there', opts)).toEqual({
+      kind: 'kudos',
+      recipientIds: [],
+      message: 'meet me there',
+    });
+  });
+
   test('"leaderboard share" stays as kudos with the literal text', () => {
     expect(parseSlashCommand('leaderboard share', opts)).toEqual({
       kind: 'kudos',

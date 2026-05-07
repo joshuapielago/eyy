@@ -236,7 +236,7 @@ describe('SCENARIO: /eyy leaderboard with zero kudos → no public post', () => 
         appCommandPayload: {
           message: {
             slashCommand: { commandId: 1 },
-            argumentText: 'leaderboard',
+            argumentText: 'me',
             annotations: [],
           },
           dialogEventType: 'REQUEST_DIALOG',
@@ -292,7 +292,7 @@ describe('SCENARIO: /eyy leaderboard with kudos → radar chart + verbatims', ()
         appCommandPayload: {
           message: {
             slashCommand: { commandId: 1 },
-            argumentText: 'leaderboard',
+            argumentText: 'me',
             annotations: [],
           },
           dialogEventType: 'REQUEST_DIALOG',
@@ -344,7 +344,7 @@ describe('SCENARIO: QuickChart probe fails → text-bar fallback (no broken imag
         appCommandPayload: {
           message: {
             slashCommand: { commandId: 1 },
-            argumentText: 'leaderboard',
+            argumentText: 'me',
             annotations: [],
           },
           dialogEventType: 'REQUEST_DIALOG',
@@ -467,7 +467,7 @@ describe('SCENARIO: leaderboard queries by email (Slack) vs user_id (GChat)', ()
         appCommandPayload: {
           message: {
             slashCommand: { commandId: 1 },
-            argumentText: 'leaderboard',
+            argumentText: 'me',
             annotations: [],
           },
           dialogEventType: 'REQUEST_DIALOG',
