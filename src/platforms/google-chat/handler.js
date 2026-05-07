@@ -155,19 +155,23 @@ async function handleLeaderboard(rawEvent) {
   const userEmail = user.email || '';
 
   let stats;
-  let verbatims;
   try {
-    [stats, verbatims] = await Promise.all([
-      getReceivedStats({ email: userEmail, userId }),
-      getRecentVerbatims({ email: userEmail, userId }, 5),
-    ]);
+    stats = await getReceivedStats({ email: userEmail, userId });
   } catch (err) {
-    console.error('[google-chat] leaderboard query failed:', err.message);
+    console.error('[google-chat] getReceivedStats failed:', err.message);
     return buildLeaderboardPrivateResponse({
       text: "Couldn't load your stats — try again in a moment.",
       viewerUserId: userId,
     });
   }
+
+  // Verbatims are best-effort. A non-critical recent-quotes failure must
+  // not block the (already-loaded) chart — same shape as Slack.
+  const verbatims = await getRecentVerbatims({ email: userEmail, userId }, 5)
+    .catch((err) => {
+      console.error('[google-chat] getRecentVerbatims failed:', err.message);
+      return [];
+    });
 
   if (stats.total === 0) {
     return buildLeaderboardPrivateResponse({

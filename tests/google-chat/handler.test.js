@@ -221,6 +221,64 @@ describe('google-chat handleEvent — leaderboard subcommand', () => {
     expect(result.hostAppDataAction).toBeDefined();
   });
 
+  test('stats query failure → private "Couldn\'t load" message, NOT empty state', async () => {
+    getReceivedStats.mockRejectedValue(new Error('connection refused'));
+    getRecentVerbatims.mockResolvedValue([]);
+
+    const event = {
+      commonEventObject: { hostApp: 'CHAT' },
+      chat: {
+        user: { displayName: 'Daisy', email: 'd@x.com', name: 'users/D1' },
+        appCommandPayload: {
+          message: {
+            slashCommand: { commandId: 1 },
+            argumentText: 'leaderboard',
+            annotations: [],
+          },
+          dialogEventType: 'REQUEST_DIALOG',
+        },
+      },
+    };
+
+    const result = await handleEvent(event);
+    const msg = result.hostAppDataAction.chatDataAction.createMessageAction.message;
+    expect(msg.text).toMatch(/couldn't load your stats/i);
+    expect(msg.text).not.toMatch(/keep being awesome/i);
+    expect(msg.privateMessageViewer).toEqual({ name: 'users/D1' });
+  });
+
+  test('verbatims-only failure does NOT block the leaderboard chart', async () => {
+    // Critical: a non-critical recent-quotes failure must not tank the
+    // whole response when stats already loaded successfully.
+    getReceivedStats.mockResolvedValue({
+      counts: { speed: 3, talent: 0, kind: 5, hightech: 0, creative: 1, clear: 0, lead: 2 },
+      total: 11,
+    });
+    getRecentVerbatims.mockRejectedValue(new Error('verbatims blew up'));
+
+    const event = {
+      commonEventObject: { hostApp: 'CHAT' },
+      chat: {
+        user: { displayName: 'Daisy', email: 'd@x.com', name: 'users/D1' },
+        appCommandPayload: {
+          message: {
+            slashCommand: { commandId: 1 },
+            argumentText: 'leaderboard',
+            annotations: [],
+          },
+          dialogEventType: 'REQUEST_DIALOG',
+        },
+      },
+    };
+
+    const result = await handleEvent(event);
+    const msg = result.hostAppDataAction.chatDataAction.createMessageAction.message;
+    // Should be the public chart, NOT the private error.
+    expect(msg.privateMessageViewer).toBeUndefined();
+    expect(msg.cardsV2).toBeDefined();
+    expect(msg.cardsV2[0].card.header.title).toContain('Daisy');
+  });
+
   test('queries by user_id when email missing', async () => {
     getReceivedStats.mockResolvedValue({ counts: emptyCounts(), total: 0 });
     getRecentVerbatims.mockResolvedValue([]);
