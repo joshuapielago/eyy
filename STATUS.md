@@ -1,8 +1,8 @@
 ---
 repo: joshuapielago/eyy
-updated: 2026-05-07T20:08:13Z
+updated: 2026-05-07T23:57:53Z
 branch: master
-commit: 0896de9
+commit: fb3285e
 counts:
   open_prs: 0
   open_issues: 0
@@ -14,11 +14,11 @@ counts:
 # Status — joshuapielago/eyy
 
 ## Recent commits (last 5 on default branch)
+- `fb3285e` · Joshua · 2026-05-08 · feat: dedupe kudos recipients across Slack and Google Chat
+- `56cbd6e` · github-actions[bot] · 2026-05-07 · chore: update STATUS.md [skip ci]
 - `0896de9` · github-actions[bot] · 2026-05-07 · chore: update STATUS.md [skip ci]
 - `2080f82` · Joshua · 2026-05-07 · feat: /eyy leaderboard now shows team-wide ranking; personal radar moved to /eyy me
 - `5efe82d` · github-actions[bot] · 2026-05-07 · chore: update STATUS.md [skip ci]
-- `d973530` · JP · 2026-05-07 · feat: leaderboard, prefill, and multi-recipient kudos (#4)
-- `007a813` · github-actions[bot] · 2026-05-06 · chore: update STATUS.md [skip ci]
 
 ## Open pull requests
 _None_
