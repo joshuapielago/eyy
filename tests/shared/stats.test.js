@@ -185,6 +185,23 @@ describe('getTeamLeaderboard', () => {
     expect(sql).toMatch(/COALESCE/);
   });
 
+  test('uses substring-based loose name match for cross-platform name variants', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    await getTeamLeaderboard({ limit: 5 });
+    const [sql] = pool.query.mock.calls[0];
+    // The loose_name CTE bridges names like "Kissa" ↔ "Norkissa" via POSITION
+    // (substring) match. Length floor of 4 prevents false matches on short
+    // names like "CJ" or "Sam"; the HAVING uniqueness check applies twice.
+    expect(sql).toMatch(/loose_name/);
+    expect(sql).toMatch(/POSITION\(k\.name_key IN u\.name_key\)/);
+    expect(sql).toMatch(/POSITION\(u\.name_key IN k\.name_key\)/);
+    expect(sql).toMatch(/LENGTH\(u\.name_key\) >= 4/);
+    // The loose match must be excluded from exact matches and ranked AFTER
+    // the strict name_index in the COALESCE chain.
+    expect(sql).toMatch(/k\.name_key <> u\.name_key/);
+    expect(sql).toMatch(/ni\.email,\s*\n\s*ln\.email/);
+  });
+
   test('returns ranked entries with name, total, top value', async () => {
     pool.query.mockResolvedValueOnce({
       rows: [

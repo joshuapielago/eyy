@@ -96,9 +96,12 @@ async function getTeamLeaderboard({ limit = 10 } = {}) {
   // Identity resolution is layered: a kudos row's canonical key prefers its
   // own recipient_email, then a learned email via user_identity (matched by
   // slack_user_id or google_user_id), then a learned email by unambiguous
-  // name match, then user_id, then a normalized name. The unambiguous-name
-  // CTE deliberately filters out names mapped to multiple distinct emails to
-  // avoid merging two people who share a display name.
+  // exact name match, then a learned email by unambiguous *substring* name
+  // match (so "Kissa" bridges to "Norkissa" when one display name is a
+  // longer/shorter form of the other), then user_id, then a normalized name.
+  // The unambiguous-name and loose-name CTEs both guard with HAVING
+  // COUNT(DISTINCT email) = 1 so two people who happen to share or contain
+  // the same token never get merged.
   const safeLimit = Math.max(1, Math.min(50, Math.floor(limit) || 10));
 
   const { rows } = await pool.query(
@@ -108,6 +111,22 @@ async function getTeamLeaderboard({ limit = 10 } = {}) {
         WHERE email IS NOT NULL AND name_key IS NOT NULL
         GROUP BY name_key
        HAVING COUNT(DISTINCT email) = 1
+     ),
+     loose_name AS (
+       SELECT k.name_key, MIN(u.email) AS email
+         FROM (SELECT DISTINCT LOWER(BTRIM(recipient_name)) AS name_key
+                 FROM kudos
+                WHERE recipient_name <> ''
+                  AND LENGTH(BTRIM(recipient_name)) >= 4) k
+         JOIN user_identity u
+           ON u.email IS NOT NULL
+          AND u.name_key IS NOT NULL
+          AND LENGTH(u.name_key) >= 4
+          AND k.name_key <> u.name_key
+          AND (POSITION(k.name_key IN u.name_key) > 0
+               OR POSITION(u.name_key IN k.name_key) > 0)
+        GROUP BY k.name_key
+       HAVING COUNT(DISTINCT u.email) = 1
      ),
      resolved AS (
        SELECT
@@ -119,6 +138,7 @@ async function getTeamLeaderboard({ limit = 10 } = {}) {
            NULLIF(k.recipient_email, ''),
            ui_id.email,
            ni.email,
+           ln.email,
            NULLIF(k.recipient_user_id, ''),
            NULLIF(LOWER(BTRIM(k.recipient_name)), '')
          ) AS identity_key
@@ -130,6 +150,9 @@ async function getTeamLeaderboard({ limit = 10 } = {}) {
        LEFT JOIN name_index ni
          ON k.recipient_name <> ''
         AND ni.name_key = LOWER(BTRIM(k.recipient_name))
+       LEFT JOIN loose_name ln
+         ON k.recipient_name <> ''
+        AND ln.name_key = LOWER(BTRIM(k.recipient_name))
        WHERE k.recipient_email <> '' OR k.recipient_user_id <> '' OR k.recipient_name <> ''
      ),
      totals AS (
