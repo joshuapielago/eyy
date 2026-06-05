@@ -52,6 +52,21 @@ describe('giphy', () => {
     expect(url).toBeNull();
   });
 
+  test('fetchRandomGif returns null when the Giphy search exceeds the timeout', async () => {
+    mockSearch.mockReturnValue(
+      new Promise((resolve) =>
+        setTimeout(
+          () => resolve({ data: [{ images: { fixed_height: { url: 'https://giphy.com/late.gif' } } }] }),
+          60
+        )
+      )
+    );
+
+    const { fetchRandomGif } = require('../../src/shared/giphy');
+    const url = await fetchRandomGif('slow', { timeoutMs: 10 });
+    expect(url).toBeNull();
+  });
+
   test('fetchRandomGif returns null when GIPHY_API_KEY is not set', async () => {
     delete process.env.GIPHY_API_KEY;
 

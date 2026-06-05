@@ -1,11 +1,32 @@
 const { Pool } = require('pg');
 const { randomUUID } = require('crypto');
 
+// SSL config is env-driven so customers can enforce full certificate
+// verification (DATABASE_SSL=verify) when their managed Postgres provides a CA,
+// while the default preserves the current Railway-compatible behavior.
+//   disable -> no TLS
+//   require -> TLS, no cert verification
+//   verify  -> TLS with full cert verification
+//   (unset) -> TLS-without-verify for managed Railway hosts, off otherwise
+function resolveSslConfig(databaseUrl = '') {
+  const mode = process.env.DATABASE_SSL;
+  if (mode === 'disable') return false;
+  if (mode === 'verify') return { rejectUnauthorized: true };
+  if (mode === 'require') return { rejectUnauthorized: false };
+
+  const url = databaseUrl || '';
+  if (url.includes('.railway.app') || url.includes('.rlwy.net')) {
+    return { rejectUnauthorized: false };
+  }
+  return false;
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('.railway.app')
-    ? { rejectUnauthorized: false }
-    : false,
+  ssl: resolveSslConfig(process.env.DATABASE_URL),
+  max: Number(process.env.DB_POOL_MAX) || 10,
+  idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
+  connectionTimeoutMillis: Number(process.env.DB_CONNECT_TIMEOUT_MS) || 5000,
 });
 
 async function initDb() {
@@ -65,4 +86,4 @@ async function saveKudos(row) {
   return result;
 }
 
-module.exports = { pool, initDb, saveKudos, saveKudosBatch };
+module.exports = { pool, initDb, saveKudos, saveKudosBatch, resolveSslConfig };

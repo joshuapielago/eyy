@@ -4,7 +4,7 @@ const { handleEventFactory } = require('./handler');
 
 function createGoogleChatRouter({ submitUrl }) {
   const router = express.Router();
-  router.use(express.json());
+  router.use(express.json({ limit: process.env.MAX_BODY_SIZE || '100kb' }));
 
   const handleEvent = handleEventFactory({ submitUrl });
 

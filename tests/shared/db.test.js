@@ -11,7 +11,43 @@ jest.mock('pg', () => ({
   Pool: jest.fn().mockImplementation(() => mockPool),
 }));
 
-const { saveKudos, saveKudosBatch } = require('../../src/shared/db');
+const { saveKudos, saveKudosBatch, resolveSslConfig } = require('../../src/shared/db');
+
+describe('resolveSslConfig', () => {
+  const orig = process.env.DATABASE_SSL;
+  afterEach(() => {
+    if (orig === undefined) delete process.env.DATABASE_SSL;
+    else process.env.DATABASE_SSL = orig;
+  });
+
+  test('DATABASE_SSL=disable turns SSL off regardless of host', () => {
+    process.env.DATABASE_SSL = 'disable';
+    expect(resolveSslConfig('postgres://x.railway.app/db')).toBe(false);
+  });
+
+  test('DATABASE_SSL=verify enforces full certificate verification', () => {
+    process.env.DATABASE_SSL = 'verify';
+    expect(resolveSslConfig('postgres://host/db')).toEqual({ rejectUnauthorized: true });
+  });
+
+  test('DATABASE_SSL=require uses TLS without certificate verification', () => {
+    process.env.DATABASE_SSL = 'require';
+    expect(resolveSslConfig('postgres://host/db')).toEqual({ rejectUnauthorized: false });
+  });
+
+  test('default: managed Railway hosts get TLS without cert verification (back-compat)', () => {
+    delete process.env.DATABASE_SSL;
+    expect(resolveSslConfig('postgres://u:p@x.railway.app:5432/db')).toEqual({ rejectUnauthorized: false });
+    expect(resolveSslConfig('postgres://u:p@x.rlwy.net:5432/db')).toEqual({ rejectUnauthorized: false });
+  });
+
+  test('default: local/other hosts get no SSL', () => {
+    delete process.env.DATABASE_SSL;
+    expect(resolveSslConfig('postgres://localhost:5432/eyy')).toBe(false);
+    expect(resolveSslConfig('')).toBe(false);
+    expect(resolveSslConfig(undefined)).toBe(false);
+  });
+});
 
 const baseRow = {
   senderEmail: 's@x.com',

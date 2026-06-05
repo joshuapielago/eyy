@@ -1,5 +1,6 @@
 jest.mock('../../src/shared/db', () => ({
   saveKudos: jest.fn().mockResolvedValue({ id: 1 }),
+  saveKudosBatch: jest.fn().mockResolvedValue([{ id: 1 }]),
   initDb: jest.fn().mockResolvedValue(),
   pool: { end: jest.fn() },
 }));
@@ -10,8 +11,8 @@ jest.mock('../../src/shared/identity', () => ({
   learnFromParticipant: jest.fn().mockResolvedValue(null),
 }));
 
-const { recordKudos } = require('../../src/shared/kudos');
-const { saveKudos } = require('../../src/shared/db');
+const { recordKudos, recordKudosBatch } = require('../../src/shared/kudos');
+const { saveKudos, saveKudosBatch } = require('../../src/shared/db');
 const { fetchRandomGif } = require('../../src/shared/giphy');
 const { learnFromParticipant } = require('../../src/shared/identity');
 
@@ -57,17 +58,28 @@ describe('recordKudos', () => {
     expect(saveKudos).toHaveBeenCalledWith(expect.objectContaining({ valueKey: 'speed' }));
   });
 
-  test('still resolves when saveKudos throws', async () => {
+  test('rejects when the save fails, so callers never announce an unsaved kudos', async () => {
     saveKudos.mockRejectedValueOnce(new Error('db down'));
-    const result = await recordKudos({
+    await expect(recordKudos({
       platform: 'slack',
       sender: { name: 'A' },
       recipient: { id: 'r', name: 'B' },
       message: 'm',
       valueKey: 'speed',
       channel: 'C',
-    });
-    expect(result.gifUrl).toBe('https://giphy.com/x.gif');
+    })).rejects.toThrow('db down');
+  });
+
+  test('recordKudosBatch rejects when the batch save fails', async () => {
+    saveKudosBatch.mockRejectedValueOnce(new Error('db down'));
+    await expect(recordKudosBatch({
+      platform: 'slack',
+      sender: { name: 'A' },
+      recipients: [{ id: 'r', name: 'B' }],
+      message: 'm',
+      valueKey: 'speed',
+      channel: 'C',
+    })).rejects.toThrow('db down');
   });
 
   test('still resolves when Giphy returns null', async () => {
@@ -82,6 +94,36 @@ describe('recordKudos', () => {
     });
     expect(result.gifUrl).toBeNull();
     expect(saveKudos).toHaveBeenCalledWith(expect.objectContaining({ gifUrl: null }));
+  });
+
+  test('honors a tenant config fixed-link GIF without calling Giphy', async () => {
+    const config = {
+      tenantId: 'T-acme',
+      values: [
+        {
+          key: 'speed',
+          name: 'Speed',
+          emoji: '⚡',
+          tagline: 't',
+          gif: { mode: 'url', url: 'https://cdn.acme.com/party.gif' },
+        },
+      ],
+      giphy: {},
+    };
+    const result = await recordKudos({
+      platform: 'slack',
+      sender: { name: 'A' },
+      recipient: { id: 'r', name: 'B' },
+      message: 'm',
+      valueKey: 'speed',
+      channel: 'C',
+      config,
+    });
+    expect(result.gifUrl).toBe('https://cdn.acme.com/party.gif');
+    expect(fetchRandomGif).not.toHaveBeenCalled();
+    expect(saveKudos).toHaveBeenCalledWith(
+      expect.objectContaining({ gifUrl: 'https://cdn.acme.com/party.gif' })
+    );
   });
 
   test('learns identity for both sender and recipient with platform tag', async () => {

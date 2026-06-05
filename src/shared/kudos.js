@@ -1,6 +1,6 @@
 const { randomUUID } = require('crypto');
-const { getValueByKey, getRandomGiphyTerm } = require('./values');
-const { fetchRandomGif } = require('./giphy');
+const { getValueByKey } = require('./values');
+const { resolveConfig, resolveGifUrl } = require('./config');
 const { saveKudos, saveKudosBatch } = require('./db');
 const { learnFromParticipant } = require('./identity');
 
@@ -14,64 +14,60 @@ async function learnAll(platform, participants) {
   );
 }
 
-async function recordKudos({ platform, sender, recipient, message, valueKey, channel }) {
+async function recordKudos({ platform, sender, recipient, message, valueKey, channel, tenantId, config }) {
   const resolvedValueKey = getValueByKey(valueKey) ? valueKey : DEFAULT_VALUE_KEY;
   const valueDef = getValueByKey(resolvedValueKey);
 
-  const searchTerm = getRandomGiphyTerm(resolvedValueKey);
-  const gifUrl = searchTerm ? await fetchRandomGif(searchTerm) : null;
+  const tenantConfig = config || resolveConfig(tenantId);
+  const gifUrl = await resolveGifUrl(tenantConfig, resolvedValueKey);
 
-  try {
-    await saveKudos({
-      platform,
-      senderEmail: sender?.email || '',
-      senderName: sender?.name || 'Someone',
-      recipientEmail: recipient?.email || '',
-      recipientName: recipient?.name || 'Someone',
-      recipientUserId: recipient?.id || '',
-      message: message || '',
-      valueKey: resolvedValueKey,
-      gifUrl,
-      spaceName: channel || '',
-    });
-  } catch (err) {
-    console.error('Failed to save kudos:', err.message);
-  }
+  // Let save failures propagate: callers must NOT announce a kudos that did
+  // not persist (that would show a success card while the DB recorded nothing).
+  await saveKudos({
+    platform,
+    senderEmail: sender?.email || '',
+    senderName: sender?.name || 'Someone',
+    recipientEmail: recipient?.email || '',
+    recipientName: recipient?.name || 'Someone',
+    recipientUserId: recipient?.id || '',
+    message: message || '',
+    valueKey: resolvedValueKey,
+    gifUrl,
+    spaceName: channel || '',
+  });
 
   await learnAll(platform, [sender, recipient]);
 
   return { valueKey: resolvedValueKey, valueDef, gifUrl };
 }
 
-async function recordKudosBatch({ platform, sender, recipients, message, valueKey, channel }) {
+async function recordKudosBatch({ platform, sender, recipients, message, valueKey, channel, tenantId, config }) {
   const resolvedValueKey = getValueByKey(valueKey) ? valueKey : DEFAULT_VALUE_KEY;
   const valueDef = getValueByKey(resolvedValueKey);
 
-  const searchTerm = getRandomGiphyTerm(resolvedValueKey);
-  const gifUrl = searchTerm ? await fetchRandomGif(searchTerm) : null;
+  const tenantConfig = config || resolveConfig(tenantId);
+  const gifUrl = await resolveGifUrl(tenantConfig, resolvedValueKey);
 
   const groupId = randomUUID();
   const list = Array.isArray(recipients) ? recipients : [];
 
-  try {
-    await saveKudosBatch(
-      list.map((r) => ({
-        platform,
-        senderEmail: sender?.email || '',
-        senderName: sender?.name || 'Someone',
-        recipientEmail: r?.email || '',
-        recipientName: r?.name || 'Someone',
-        recipientUserId: r?.id || '',
-        message: message || '',
-        valueKey: resolvedValueKey,
-        gifUrl,
-        spaceName: channel || '',
-      })),
-      { kudosGroupId: groupId }
-    );
-  } catch (err) {
-    console.error('Failed to save kudos batch:', err.message);
-  }
+  // Let save failures propagate: callers must NOT announce a kudos that did
+  // not persist. saveKudosBatch is transactional (all-or-nothing).
+  await saveKudosBatch(
+    list.map((r) => ({
+      platform,
+      senderEmail: sender?.email || '',
+      senderName: sender?.name || 'Someone',
+      recipientEmail: r?.email || '',
+      recipientName: r?.name || 'Someone',
+      recipientUserId: r?.id || '',
+      message: message || '',
+      valueKey: resolvedValueKey,
+      gifUrl,
+      spaceName: channel || '',
+    })),
+    { kudosGroupId: groupId }
+  );
 
   await learnAll(platform, [sender, ...list]);
 
