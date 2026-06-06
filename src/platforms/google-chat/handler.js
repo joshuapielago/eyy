@@ -12,8 +12,8 @@ const {
   resolveRecipientsFromInput,
   userIdFromGoogleUser,
 } = require('./identity');
-const { getValueByKey } = require('../../shared/values');
-const { recordKudosBatch, DEFAULT_VALUE_KEY } = require('../../shared/kudos');
+const { getValueDef, defaultValueKey } = require('../../shared/config');
+const { recordKudosBatch } = require('../../shared/kudos');
 const { parseSlashCommand, GCHAT_MENTION_REGEX } = require('../../shared/commands');
 const {
   getReceivedStats,
@@ -87,8 +87,8 @@ async function handleSubmit(rawEvent) {
 
   const recipientText = getInput('recipient') || '';
   const message = getInput('message') || '';
-  const rawValueKey = getInput('valueKey') || DEFAULT_VALUE_KEY;
-  const valueKey = getValueByKey(rawValueKey) ? rawValueKey : DEFAULT_VALUE_KEY;
+  const rawValueKey = getInput('valueKey') || defaultValueKey();
+  const valueKey = getValueDef(rawValueKey) ? rawValueKey : defaultValueKey();
 
   const params = commonEvent.parameters || {};
   const paramRecipientIds = (params.recipientUserIds || '')

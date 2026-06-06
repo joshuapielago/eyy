@@ -1,5 +1,11 @@
 # EYY Customization Design — "Define your own values + bring your own GIFs"
 
+> **Status (self-host direction):** IMPLEMENTED. Customization now ships as a
+> single operator config file (`eyy.config.json` via `EYY_CONFIG_PATH`), not a
+> per-tenant DB. The value picker, posted cards, leaderboard chart, and stats all
+> read it. See [SETUP.md](../../SETUP.md). The multi-tenant/DB sections below are
+> retained as reference for the parked SaaS direction.
+
 Owner priority #1 for productizing EYY: every customer must be able to
 **define their own recognition values** and **supply their own GIFs**
 (their own Giphy key, their own Giphy searches, or a specific link they paste).

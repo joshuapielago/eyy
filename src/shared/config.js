@@ -115,6 +115,21 @@ function _resetConfigCacheForTests() {
   cachedFilePath = undefined;
 }
 
+// Zero-arg convenience accessors for the single operator config (self-host).
+// UI builders and stats call these instead of importing the static value list.
+function listValueDefs() {
+  return resolveConfig().values;
+}
+
+function getValueDef(key) {
+  return getValue(resolveConfig(), key);
+}
+
+function defaultValueKey() {
+  const values = resolveConfig().values;
+  return (values[0] && values[0].key) || 'speed';
+}
+
 function listValues(config = DEFAULT_CONFIG) {
   return config.values;
 }
@@ -150,5 +165,8 @@ module.exports = {
   resolveGifUrl,
   normalizeConfig,
   loadConfigFile,
+  listValueDefs,
+  getValueDef,
+  defaultValueKey,
   _resetConfigCacheForTests,
 };

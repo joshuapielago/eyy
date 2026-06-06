@@ -1,6 +1,5 @@
 const { randomUUID } = require('crypto');
-const { getValueByKey } = require('./values');
-const { resolveConfig, resolveGifUrl } = require('./config');
+const { resolveConfig, resolveGifUrl, getValue } = require('./config');
 const { saveKudos, saveKudosBatch } = require('./db');
 const { learnFromParticipant } = require('./identity');
 
@@ -15,10 +14,12 @@ async function learnAll(platform, participants) {
 }
 
 async function recordKudos({ platform, sender, recipient, message, valueKey, channel, tenantId, config }) {
-  const resolvedValueKey = getValueByKey(valueKey) ? valueKey : DEFAULT_VALUE_KEY;
-  const valueDef = getValueByKey(resolvedValueKey);
-
   const tenantConfig = config || resolveConfig(tenantId);
+  const resolvedValueKey = getValue(tenantConfig, valueKey)
+    ? valueKey
+    : (tenantConfig.values[0]?.key || DEFAULT_VALUE_KEY);
+  const valueDef = getValue(tenantConfig, resolvedValueKey);
+
   const gifUrl = await resolveGifUrl(tenantConfig, resolvedValueKey);
 
   // Let save failures propagate: callers must NOT announce a kudos that did
@@ -42,10 +43,12 @@ async function recordKudos({ platform, sender, recipient, message, valueKey, cha
 }
 
 async function recordKudosBatch({ platform, sender, recipients, message, valueKey, channel, tenantId, config }) {
-  const resolvedValueKey = getValueByKey(valueKey) ? valueKey : DEFAULT_VALUE_KEY;
-  const valueDef = getValueByKey(resolvedValueKey);
-
   const tenantConfig = config || resolveConfig(tenantId);
+  const resolvedValueKey = getValue(tenantConfig, valueKey)
+    ? valueKey
+    : (tenantConfig.values[0]?.key || DEFAULT_VALUE_KEY);
+  const valueDef = getValue(tenantConfig, resolvedValueKey);
+
   const gifUrl = await resolveGifUrl(tenantConfig, resolvedValueKey);
 
   const groupId = randomUUID();
