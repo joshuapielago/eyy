@@ -3,13 +3,19 @@ jest.mock('../../src/shared/giphy', () => ({
   fetchRandomGif: (...args) => mockFetchRandomGif(...args),
 }));
 
+const path = require('path');
 const {
   DEFAULT_CONFIG,
   resolveConfig,
   listValues,
   getValue,
   resolveGifUrl,
+  normalizeConfig,
+  loadConfigFile,
+  _resetConfigCacheForTests,
 } = require('../../src/shared/config');
+
+const EXAMPLE_CONFIG = path.join(__dirname, '..', '..', 'eyy.config.example.json');
 
 describe('tenant config engine', () => {
   beforeEach(() => {
@@ -73,5 +79,79 @@ describe('tenant config engine', () => {
   test('resolveGifUrl returns null for a url-mode value with no url set', async () => {
     const config = { values: [{ key: 'x', gif: { mode: 'url' } }] };
     expect(await resolveGifUrl(config, 'x')).toBeNull();
+  });
+});
+
+describe('normalizeConfig (operator-defined values)', () => {
+  test('normalizes search-mode and url-mode values and fills defaults', () => {
+    const cfg = normalizeConfig({
+      values: [
+        { key: 'a', name: 'Alpha', gif: { mode: 'search', terms: ['x'] } },
+        { key: 'b', name: 'Beta', gif: { mode: 'url', url: 'https://e.com/g.gif' } },
+      ],
+    });
+    expect(cfg.brandName).toBe('EYYY');
+    expect(cfg.values).toHaveLength(2);
+    expect(cfg.values[0]).toMatchObject({ key: 'a', name: 'Alpha', emoji: '', tagline: '' });
+    expect(cfg.values[0].gif).toEqual({ mode: 'search', terms: ['x'] });
+    expect(cfg.values[1].gif).toEqual({ mode: 'url', url: 'https://e.com/g.gif' });
+  });
+
+  test('treats bare terms as a search GIF and missing gif as no GIF', () => {
+    const cfg = normalizeConfig({
+      values: [
+        { key: 'a', name: 'A', gif: { terms: ['p', 'q'] } },
+        { key: 'b', name: 'B' },
+      ],
+    });
+    expect(cfg.values[0].gif).toEqual({ mode: 'search', terms: ['p', 'q'] });
+    expect(cfg.values[1].gif).toEqual({ mode: 'search', terms: [] });
+  });
+
+  test('throws when values is missing or empty', () => {
+    expect(() => normalizeConfig({})).toThrow();
+    expect(() => normalizeConfig({ values: [] })).toThrow();
+  });
+
+  test('throws when a value lacks key or name', () => {
+    expect(() => normalizeConfig({ values: [{ key: 'a' }] })).toThrow(/name/);
+    expect(() => normalizeConfig({ values: [{ name: 'A' }] })).toThrow(/key/);
+  });
+
+  test('throws on duplicate value keys', () => {
+    expect(() =>
+      normalizeConfig({ values: [{ key: 'a', name: 'A' }, { key: 'a', name: 'B' }] })
+    ).toThrow(/duplicate/i);
+  });
+});
+
+describe('loadConfigFile + file-driven resolveConfig', () => {
+  afterEach(() => {
+    delete process.env.EYY_CONFIG_PATH;
+    _resetConfigCacheForTests();
+  });
+
+  test('the shipped eyy.config.example.json is valid', () => {
+    const cfg = loadConfigFile(EXAMPLE_CONFIG);
+    expect(cfg.values.length).toBeGreaterThan(0);
+    expect(cfg.values.every((v) => v.key && v.name)).toBe(true);
+  });
+
+  test('loadConfigFile throws a helpful error for a missing file', () => {
+    expect(() => loadConfigFile('/no/such/eyy.config.json')).toThrow(/EYY config/);
+  });
+
+  test('resolveConfig loads the operator file when EYY_CONFIG_PATH is set', () => {
+    process.env.EYY_CONFIG_PATH = EXAMPLE_CONFIG;
+    _resetConfigCacheForTests();
+    const cfg = resolveConfig();
+    expect(cfg.values.length).toBeGreaterThan(0);
+    expect(cfg).not.toBe(DEFAULT_CONFIG);
+  });
+
+  test('resolveConfig falls back to the built-in default when no file is configured', () => {
+    delete process.env.EYY_CONFIG_PATH;
+    _resetConfigCacheForTests();
+    expect(resolveConfig()).toBe(DEFAULT_CONFIG);
   });
 });

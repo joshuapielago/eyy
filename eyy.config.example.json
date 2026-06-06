@@ -1,0 +1,42 @@
+{
+  "_comment": "Copy this to eyy.config.json and point EYY_CONFIG_PATH at it (or leave it next to package.json). Define YOUR company's recognition values and GIFs here — no code changes needed. Secrets (Giphy API key, bot tokens, DB) stay in environment variables, not this file.",
+  "brandName": "EYYY",
+  "values": [
+    {
+      "key": "teamwork",
+      "name": "Team Player",
+      "emoji": "🤝",
+      "tagline": "We win together",
+      "gif": { "mode": "search", "terms": ["teamwork", "high five", "celebration"] }
+    },
+    {
+      "key": "ownership",
+      "name": "Takes Ownership",
+      "emoji": "🦅",
+      "tagline": "See it, own it",
+      "gif": { "mode": "search", "terms": ["like a boss", "own it"] }
+    },
+    {
+      "key": "craft",
+      "name": "Quality Craft",
+      "emoji": "🛠️",
+      "tagline": "Built to last",
+      "gif": { "mode": "search", "terms": ["nailed it", "perfect"] }
+    },
+    {
+      "key": "kindness",
+      "name": "Kind by Default",
+      "emoji": "💛",
+      "tagline": "Assume good intent",
+      "gif": { "mode": "url", "url": "https://media.giphy.com/media/your-own-branded-gif.gif" }
+    },
+    {
+      "key": "speed",
+      "name": "Moves Fast",
+      "emoji": "⚡",
+      "tagline": "Ship it",
+      "gif": { "mode": "search", "terms": ["fast", "speed run"] }
+    }
+  ],
+  "giphy": { "rating": "pg" }
+}

@@ -1,0 +1,34 @@
+# Slack app manifest for self-hosted EYYY.
+# Create your app at https://api.slack.com/apps -> "Create New App" -> "From a manifest",
+# then replace every YOUR_DOMAIN below with your deployment's public HTTPS host
+# (e.g. eyy.yourcompany.com). After creating, install to your workspace and copy:
+#   Signing Secret      -> SLACK_SIGNING_SECRET
+#   Bot User OAuth Token -> SLACK_BOT_TOKEN  (starts with xoxb-)
+display_information:
+  name: EYYY
+  description: Give a teammate a shoutout tied to a company value, with a GIF.
+  background_color: "#ffa500"
+features:
+  bot_user:
+    display_name: EYYY
+    always_online: true
+  slash_commands:
+    - command: /eyy
+      url: https://YOUR_DOMAIN/slack/commands
+      description: Give someone an eyyy!
+      usage_hint: "@teammate great work"
+      should_escape: true
+oauth_config:
+  scopes:
+    bot:
+      - commands
+      - chat:write
+      - users:read
+      - users:read.email
+settings:
+  interactivity:
+    is_enabled: true
+    request_url: https://YOUR_DOMAIN/slack/interactivity
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
