@@ -127,7 +127,7 @@ describe('getRecentVerbatims', () => {
     const result = await getRecentVerbatims('me@x.com', 5);
     expect(result).toHaveLength(2);
     expect(result[0].sender_name).toBe('Alice');
-    expect(result[0].value_name).toBe('Kind by Default');
+    expect(result[0].value_name).toBe('Kindness');
     expect(result[0].value_emoji).toBe('💛');
   });
 
@@ -231,7 +231,7 @@ describe('getTeamLeaderboard', () => {
       total: 12,
       topValueKey: 'kind',
       topValueEmoji: '💛',
-      topValueName: 'Kind by Default',
+      topValueName: 'Kindness',
     });
     expect(result[1].name).toBe('Bob');
   });

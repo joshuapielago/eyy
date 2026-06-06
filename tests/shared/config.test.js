@@ -42,7 +42,7 @@ describe('tenant config engine', () => {
   });
 
   test('getValue finds a value by key and is undefined for unknown keys', () => {
-    expect(getValue(DEFAULT_CONFIG, 'speed').name).toBe('Speed Is Our Advantage');
+    expect(getValue(DEFAULT_CONFIG, 'speed').name).toBe('Speed');
     expect(getValue(DEFAULT_CONFIG, 'nope')).toBeUndefined();
   });
 

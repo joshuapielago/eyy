@@ -1,0 +1,37 @@
+# One-click deploy blueprint for Render (https://render.com).
+# Provisions a free web service + Postgres and wires DATABASE_URL automatically.
+# After deploy, set the secret env vars (Giphy key, Slack/Google Chat) in the
+# Render dashboard, and PUBLIC_BASE_URL to the service's URL.
+services:
+  - type: web
+    name: eyyy
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: node src/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: eyyy-db
+          property: connectionString
+      # Set these in the dashboard (sync:false = not stored in the blueprint):
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: GIPHY_API_KEY
+        sync: false
+      - key: SLACK_SIGNING_SECRET
+        sync: false
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: GOOGLE_CHAT_AUDIENCE
+        sync: false
+      # To use your own values/GIFs, add eyy.config.json to the repo and set:
+      # - key: EYY_CONFIG_PATH
+      #   value: ./eyy.config.json
+
+databases:
+  - name: eyyy-db
+    plan: free

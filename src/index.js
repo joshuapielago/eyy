@@ -48,6 +48,17 @@ if (require.main === module) {
   const app = buildApp();
   const PORT = process.env.PORT || 3000;
 
+  // Validate the operator config eagerly so a bad EYY_CONFIG_PATH fails at boot
+  // with a clear message, rather than erroring on every kudos request.
+  try {
+    const cfg = require('./shared/config').resolveConfig();
+    const source = process.env.EYY_CONFIG_PATH || 'built-in defaults';
+    console.log(`[config] ${cfg.values.length} values loaded (${source})`);
+  } catch (err) {
+    console.error('[config] Failed to load EYY config, exiting:', err.message);
+    process.exit(1);
+  }
+
   const startServer = () => {
     const server = app.listen(PORT, () => {
       console.log(`EYY server running on port ${PORT} 🤙`);

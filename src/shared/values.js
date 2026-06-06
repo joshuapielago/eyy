@@ -1,44 +1,48 @@
+// Built-in default value set — a neutral starter shown when an operator has not
+// supplied their own eyy.config.json. Operators are expected to replace these
+// with their own company values (see eyy.config.example.json + SETUP.md); this
+// set exists only so a fresh clone works out of the box.
 const VALUES = {
   speed: {
-    name: 'Speed Is Our Advantage',
+    name: 'Speed',
     emoji: '⚡',
-    tagline: 'Move fast, win first',
-    giphyTerms: ['fast and furious', 'speed run', 'sonic fast', 'lightning speed'],
+    tagline: 'Move fast and deliver',
+    giphyTerms: ['fast and furious', 'speed run', 'lightning speed', 'sonic fast'],
   },
   talent: {
-    name: 'Talent Everywhere',
-    emoji: '💎',
-    tagline: 'Great people come from unexpected places',
-    giphyTerms: ['hidden gem', 'diamond in the rough', 'rising star', 'underdog wins'],
+    name: 'Growth',
+    emoji: '🌱',
+    tagline: 'Always be learning',
+    giphyTerms: ['level up', 'rising star', 'growth', 'glow up'],
   },
   kind: {
-    name: 'Kind by Default',
+    name: 'Kindness',
     emoji: '💛',
     tagline: 'Assume good intent, respond with grace',
     giphyTerms: ['group hug', 'kindness', 'wholesome', 'you are awesome'],
   },
   hightech: {
-    name: 'High Tech, High Touch',
-    emoji: '🤖',
-    tagline: 'AI for efficiency, humans for excellence',
-    giphyTerms: ['futuristic', 'high five robot', 'tech magic', 'vip treatment'],
+    name: 'Craftsmanship',
+    emoji: '🛠️',
+    tagline: 'Build it well',
+    giphyTerms: ['nailed it', 'master craftsman', 'tech magic', 'perfectly balanced'],
   },
   creative: {
-    name: 'Radically Creative',
+    name: 'Creativity',
     emoji: '🎨',
-    tagline: 'Constraints spark our best ideas',
+    tagline: 'Think differently',
     giphyTerms: ['creative genius', 'mind blown', 'lightbulb moment', 'big brain'],
   },
   clear: {
-    name: 'Clear as Day',
+    name: 'Clarity',
     emoji: '🔍',
-    tagline: "If it's not clear, it's not done",
+    tagline: 'Communicate clearly',
     giphyTerms: ['crystal clear', 'mic drop', 'nailed it', 'perfectly balanced'],
   },
   lead: {
-    name: 'Lead It, Own It',
-    emoji: '👑',
-    tagline: 'Lead from your seat, own your impact',
+    name: 'Ownership',
+    emoji: '🦅',
+    tagline: 'Own the outcome',
     giphyTerms: ['boss move', 'like a boss', 'leadership', 'own it'],
   },
 };
