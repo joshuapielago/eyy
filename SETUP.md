@@ -33,6 +33,10 @@ In `eyy.config.json`, each value's GIF can be a **search** (`"mode": "search"`,
 random Giphy result from your terms) or a **fixed link** (`"mode": "url"`, always
 sends that exact GIF/image — bring your own).
 
+> **On a PaaS (Railway / Render):** instead of shipping a file, paste the whole
+> config into the **`EYY_CONFIG_JSON`** env var (one line). It takes precedence
+> over `EYY_CONFIG_PATH`, so there's nothing to mount or commit.
+
 ## 3. Run it
 
 **Node:**

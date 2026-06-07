@@ -96,12 +96,34 @@ function loadConfigFile(filePath) {
   return normalizeConfig(raw);
 }
 
+function loadInlineConfig(jsonString) {
+  let raw;
+  try {
+    raw = JSON.parse(jsonString);
+  } catch (err) {
+    throw new Error(`Failed to parse EYY config from EYY_CONFIG_JSON: ${err.message}`);
+  }
+  return normalizeConfig(raw);
+}
+
 let cachedFileConfig;
 let cachedFilePath;
+let cachedInlineConfig;
+let cachedInlineRaw;
 
-// Self-host: a single operator config per deployment. EYY_CONFIG_PATH (if set)
-// points at the operator's eyy.config.json; otherwise the built-in sample is used.
+// Self-host: a single operator config per deployment. Resolution order:
+//   1. EYY_CONFIG_JSON  — inline JSON (easiest on PaaS like Railway/Render)
+//   2. EYY_CONFIG_PATH  — path to an eyy.config.json file (local/Docker)
+//   3. built-in default sample
 function resolveConfig(/* tenantId — single-tenant in self-host */) {
+  const inline = process.env.EYY_CONFIG_JSON;
+  if (inline) {
+    if (cachedInlineConfig && cachedInlineRaw === inline) return cachedInlineConfig;
+    cachedInlineConfig = loadInlineConfig(inline);
+    cachedInlineRaw = inline;
+    return cachedInlineConfig;
+  }
+
   const filePath = process.env.EYY_CONFIG_PATH;
   if (!filePath) return DEFAULT_CONFIG;
   if (cachedFileConfig && cachedFilePath === filePath) return cachedFileConfig;
@@ -113,6 +135,8 @@ function resolveConfig(/* tenantId — single-tenant in self-host */) {
 function _resetConfigCacheForTests() {
   cachedFileConfig = undefined;
   cachedFilePath = undefined;
+  cachedInlineConfig = undefined;
+  cachedInlineRaw = undefined;
 }
 
 // Zero-arg convenience accessors for the single operator config (self-host).

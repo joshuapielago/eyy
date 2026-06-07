@@ -73,7 +73,8 @@ in [`deploy/slack-app-manifest.yaml`](deploy/slack-app-manifest.yaml)) and Googl
 |----------|----------|-------------|
 | `DATABASE_URL` | yes | PostgreSQL connection string |
 | `PUBLIC_BASE_URL` | prod | Public HTTPS URL of this deployment |
-| `EYY_CONFIG_PATH` | no | Path to your `eyy.config.json` (else built-in defaults) |
+| `EYY_CONFIG_JSON` | no | Inline JSON config — easiest on PaaS; wins over `EYY_CONFIG_PATH` |
+| `EYY_CONFIG_PATH` | no | Path to your `eyy.config.json` file (else built-in defaults) |
 | `GIPHY_API_KEY` | no | Your Giphy key (no key → no search GIFs) |
 | `DATABASE_SSL` | no | `disable` \| `require` \| `verify` (default auto-detects managed hosts) |
 | `SLACK_SIGNING_SECRET` + `SLACK_BOT_TOKEN` | for Slack | Enables the Slack endpoints |

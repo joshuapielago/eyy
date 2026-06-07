@@ -155,3 +155,36 @@ describe('loadConfigFile + file-driven resolveConfig', () => {
     expect(resolveConfig()).toBe(DEFAULT_CONFIG);
   });
 });
+
+describe('EYY_CONFIG_JSON (inline config for PaaS deploys)', () => {
+  afterEach(() => {
+    delete process.env.EYY_CONFIG_JSON;
+    delete process.env.EYY_CONFIG_PATH;
+    _resetConfigCacheForTests();
+  });
+
+  test('resolveConfig loads an inline JSON config from the env var', () => {
+    process.env.EYY_CONFIG_JSON = JSON.stringify({
+      brandName: 'Acme',
+      values: [{ key: 'grit', name: 'Grit' }],
+    });
+    _resetConfigCacheForTests();
+    const cfg = resolveConfig();
+    expect(cfg.brandName).toBe('Acme');
+    expect(cfg.values.map((v) => v.key)).toEqual(['grit']);
+  });
+
+  test('EYY_CONFIG_JSON takes precedence over EYY_CONFIG_PATH', () => {
+    process.env.EYY_CONFIG_PATH = EXAMPLE_CONFIG;
+    process.env.EYY_CONFIG_JSON = JSON.stringify({ values: [{ key: 'inline', name: 'Inline' }] });
+    _resetConfigCacheForTests();
+    const cfg = resolveConfig();
+    expect(cfg.values.map((v) => v.key)).toEqual(['inline']);
+  });
+
+  test('invalid EYY_CONFIG_JSON throws a helpful error', () => {
+    process.env.EYY_CONFIG_JSON = '{not valid json';
+    _resetConfigCacheForTests();
+    expect(() => resolveConfig()).toThrow(/EYY config/);
+  });
+});
