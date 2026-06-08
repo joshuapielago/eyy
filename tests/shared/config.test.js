@@ -52,6 +52,15 @@ describe('tenant config engine', () => {
     expect(mockFetchRandomGif).toHaveBeenCalledTimes(1);
   });
 
+  test('resolveGifUrl forwards the configured Giphy rating to the search', async () => {
+    const config = {
+      values: [{ key: 'a', name: 'A', gif: { mode: 'search', terms: ['x'] } }],
+      giphy: { apiKey: null, rating: 'g' },
+    };
+    await resolveGifUrl(config, 'a');
+    expect(mockFetchRandomGif).toHaveBeenCalledWith('x', expect.objectContaining({ rating: 'g' }));
+  });
+
   test('resolveGifUrl returns a tenant fixed link for url-mode values WITHOUT calling Giphy', async () => {
     const config = {
       tenantId: 'T-acme',

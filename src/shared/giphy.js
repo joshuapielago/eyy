@@ -7,11 +7,11 @@ const gf = process.env.GIPHY_API_KEY ? new GiphyFetch(process.env.GIPHY_API_KEY)
 const DEFAULT_TIMEOUT_MS = Number(process.env.GIPHY_TIMEOUT_MS) || 1500;
 const TIMEOUT = Symbol('giphy-timeout');
 
-async function fetchRandomGif(searchTerm, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+async function fetchRandomGif(searchTerm, { timeoutMs = DEFAULT_TIMEOUT_MS, rating = 'pg' } = {}) {
   if (!gf) return null;
   let timer;
   try {
-    const search = gf.search(searchTerm, { limit: 25, rating: 'pg' });
+    const search = gf.search(searchTerm, { limit: 25, rating });
     const result = await Promise.race([
       search,
       new Promise((resolve) => {

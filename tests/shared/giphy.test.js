@@ -36,6 +36,16 @@ describe('giphy', () => {
     expect(mockSearch).toHaveBeenCalledWith('celebration', { limit: 25, rating: 'pg' });
   });
 
+  test('fetchRandomGif passes a custom rating to the Giphy search', async () => {
+    mockSearch.mockResolvedValue({
+      data: [{ images: { fixed_height: { url: 'https://giphy.com/test.gif' } } }],
+    });
+
+    const { fetchRandomGif } = require('../../src/shared/giphy');
+    await fetchRandomGif('celebration', { rating: 'g' });
+    expect(mockSearch).toHaveBeenCalledWith('celebration', { limit: 25, rating: 'g' });
+  });
+
   test('fetchRandomGif returns null when search returns empty results', async () => {
     mockSearch.mockResolvedValue({ data: [] });
 

@@ -178,7 +178,7 @@ async function resolveGifUrl(config, valueKey) {
 
   const terms = gif.terms || [];
   if (terms.length === 0) return null;
-  return fetchRandomGif(pickRandom(terms));
+  return fetchRandomGif(pickRandom(terms), { rating: config.giphy && config.giphy.rating });
 }
 
 module.exports = {
