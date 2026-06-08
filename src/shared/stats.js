@@ -1,12 +1,11 @@
 const { pool } = require('./db');
-const { VALUES } = require('./values');
+const { listValueDefs, getValueDef } = require('./config');
 
-const VALUE_KEYS = Object.keys(VALUES);
 const MAX_VERBATIMS = 50;
 
 function emptyCounts() {
-  return VALUE_KEYS.reduce((acc, k) => {
-    acc[k] = 0;
+  return listValueDefs().reduce((acc, v) => {
+    acc[v.key] = 0;
     return acc;
   }, {});
 }
@@ -77,7 +76,7 @@ async function getRecentVerbatims(identity, limit = 5) {
   );
 
   return rows.map((r) => {
-    const value = VALUES[r.value_key];
+    const value = getValueDef(r.value_key);
     return {
       sender_name: r.sender_name,
       message: r.message,
@@ -201,7 +200,7 @@ async function getTeamLeaderboard({ limit = 10 } = {}) {
   );
 
   return rows.map((r) => {
-    const value = VALUES[r.top_value];
+    const value = getValueDef(r.top_value);
     return {
       identityKey: r.identity_key,
       name: r.recipient_name || r.identity_key,

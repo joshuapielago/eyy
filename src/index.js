@@ -31,8 +31,14 @@ function buildApp() {
     console.log('[slack] SLACK_SIGNING_SECRET or SLACK_BOT_TOKEN not set; Slack endpoints disabled');
   }
 
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', app: 'eyy' });
+  app.get('/health', async (_req, res) => {
+    try {
+      await pool.query('SELECT 1');
+      res.json({ status: 'ok', app: 'eyy' });
+    } catch (err) {
+      console.error('[health] database check failed:', err.message);
+      res.status(503).json({ status: 'error', app: 'eyy' });
+    }
   });
 
   return app;
@@ -41,6 +47,17 @@ function buildApp() {
 if (require.main === module) {
   const app = buildApp();
   const PORT = process.env.PORT || 3000;
+
+  // Validate the operator config eagerly so a bad EYY_CONFIG_PATH fails at boot
+  // with a clear message, rather than erroring on every kudos request.
+  try {
+    const cfg = require('./shared/config').resolveConfig();
+    const source = process.env.EYY_CONFIG_PATH || 'built-in defaults';
+    console.log(`[config] ${cfg.values.length} values loaded (${source})`);
+  } catch (err) {
+    console.error('[config] Failed to load EYY config, exiting:', err.message);
+    process.exit(1);
+  }
 
   const startServer = () => {
     const server = app.listen(PORT, () => {
@@ -65,8 +82,10 @@ if (require.main === module) {
   initDb()
     .then(startServer)
     .catch((err) => {
-      console.error('Failed to initialize database:', err.message);
-      startServer();
+      // Fail fast: serving with an uninitialized/broken schema silently corrupts
+      // data. Exit non-zero so the platform (Railway) restarts or rolls back.
+      console.error('Failed to initialize database, exiting:', err.message);
+      process.exit(1);
     });
 }
 

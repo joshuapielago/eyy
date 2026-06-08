@@ -329,7 +329,7 @@ describe('SCENARIO: QuickChart probe fails → text-bar fallback (no broken imag
       (b) => b.type === 'section' && b.text?.text?.startsWith('```')
     );
     expect(codeBlock).toBeDefined();
-    expect(codeBlock.text.text).toContain('Kind by Default');
+    expect(codeBlock.text.text).toContain('Kindness');
   });
 
   test('Google Chat: no image widget, <pre> text-bar paragraph instead', async () => {

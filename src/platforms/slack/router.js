@@ -5,7 +5,11 @@ const { handleSlashCommand, handleViewSubmission } = require('./handler');
 function createSlackRouter() {
   const router = express.Router();
 
-  router.use(express.urlencoded({ extended: false, verify: rawBodySaver }));
+  router.use(express.urlencoded({
+    extended: false,
+    limit: process.env.MAX_BODY_SIZE || '100kb',
+    verify: rawBodySaver,
+  }));
   router.use(slackVerifyMiddleware);
 
   router.post('/commands', async (req, res) => {

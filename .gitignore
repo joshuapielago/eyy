@@ -1,3 +1,9 @@
 node_modules/
 .env
 .superpowers/
+
+# Operator value/GIF configs are private per-deployment — keep them out of the
+# public repo. The committed template is eyy.config.example.json.
+eyy.config.json
+eyy.config.*.json
+!eyy.config.example.json

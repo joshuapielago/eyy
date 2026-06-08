@@ -56,7 +56,7 @@ describe('formatTextBars', () => {
     const counts = { speed: 5, talent: 1, kind: 8, hightech: 2, creative: 3, clear: 0, lead: 4 };
     const out = formatTextBars(counts);
     const lines = out.split('\n');
-    expect(lines[0]).toContain('Kind by Default');
+    expect(lines[0]).toContain('Kindness');
     expect(lines[0]).toContain('· 8');
     expect(lines[lines.length - 1]).toMatch(/· 0$/);
   });

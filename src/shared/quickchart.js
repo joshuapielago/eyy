@@ -1,7 +1,9 @@
-const { VALUES } = require('./values');
+const { DEFAULT_CONFIG, listValueDefs } = require('./config');
 
 const QUICKCHART_BASE = 'https://quickchart.io/chart';
-const VALUE_KEYS_IN_ORDER = ['speed', 'talent', 'kind', 'hightech', 'creative', 'clear', 'lead'];
+// Back-compat export = the built-in default order. Live rendering uses the
+// operator's configured value set via listValueDefs().
+const VALUE_KEYS_IN_ORDER = DEFAULT_CONFIG.values.map((v) => v.key);
 const DEFAULT_WIDTH = 500;
 const DEFAULT_HEIGHT = 500;
 const DEFAULT_TIMEOUT_MS = 1500;
@@ -10,8 +12,9 @@ const BAR_BLOCK = '🟦';
 const MAX_BAR_BLOCKS = 10;
 
 function buildRadarUrl({ counts, label = '' }) {
-  const data = VALUE_KEYS_IN_ORDER.map((k) => Number(counts?.[k]) || 0);
-  const labels = VALUE_KEYS_IN_ORDER.map((k) => VALUES[k]?.name?.split(/[\s,]/)[0] || k);
+  const defs = listValueDefs();
+  const data = defs.map((v) => Number(counts?.[v.key]) || 0);
+  const labels = defs.map((v) => v.name?.split(/[\s,]/)[0] || v.key);
 
   const config = {
     type: 'radar',
@@ -46,10 +49,10 @@ function buildRadarUrl({ counts, label = '' }) {
 }
 
 function formatTextBars(counts) {
-  const rows = VALUE_KEYS_IN_ORDER.map((k) => ({
-    key: k,
-    name: VALUES[k]?.name || k,
-    n: Number(counts?.[k]) || 0,
+  const rows = listValueDefs().map((v) => ({
+    key: v.key,
+    name: v.name || v.key,
+    n: Number(counts?.[v.key]) || 0,
   }));
   rows.sort((a, b) => b.n - a.n);
   return rows

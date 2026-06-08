@@ -1,4 +1,4 @@
-const { getValueByKey } = require('../../shared/values');
+const { getValueDef, listValueDefs } = require('../../shared/config');
 const { escapeHtml } = require('../../shared/sanitize');
 
 const HYPE_HEADERS = [
@@ -36,7 +36,7 @@ function buildEyyyCard({
   valueKey,
   gifUrl,
 }) {
-  const value = getValueByKey(valueKey);
+  const value = getValueDef(valueKey) || listValueDefs()[0];
   const hypeHeader = HYPE_HEADERS[Math.floor(Math.random() * HYPE_HEADERS.length)];
 
   const resolvedRecipients = Array.isArray(recipients) && recipients.length > 0

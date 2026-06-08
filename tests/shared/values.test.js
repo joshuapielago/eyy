@@ -17,7 +17,7 @@ describe('values', () => {
 
   test('getValueByKey returns correct value', () => {
     const val = getValueByKey('speed');
-    expect(val.name).toBe('Speed Is Our Advantage');
+    expect(val.name).toBe('Speed');
     expect(val.emoji).toBe('⚡');
   });
 

@@ -1,7 +1,7 @@
 {
   "name": "eyy",
   "version": "1.0.0",
-  "description": "",
+  "description": "Self-hosted peer-recognition (kudos) bot for Slack and Google Chat.",
   "main": "index.js",
   "directories": {
     "doc": "docs"
@@ -14,6 +14,9 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@giphy/js-fetch-api": "^5.7.0",
     "@slack/web-api": "^7.15.1",
@@ -22,6 +25,7 @@
     "pg": "^8.20.0"
   },
   "devDependencies": {
-    "jest": "^30.3.0"
+    "jest": "^30.3.0",
+    "supertest": "^7.2.2"
   }
 }

@@ -34,8 +34,8 @@ describe('buildEyyyBlocks', () => {
   test('includes value name and tagline in a context block', () => {
     const result = buildEyyyBlocks(base);
     const ctx = result.blocks.find((b) => b.type === 'context');
-    expect(ctx.elements[0].text).toContain('Speed Is Our Advantage');
-    expect(ctx.elements[0].text).toContain('Move fast, win first');
+    expect(ctx.elements[0].text).toContain('Speed');
+    expect(ctx.elements[0].text).toContain('Move fast and deliver');
   });
 
   test('appends an image block when gifUrl is present', () => {

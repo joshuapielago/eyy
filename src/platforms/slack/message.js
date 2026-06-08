@@ -1,4 +1,4 @@
-const { getValueByKey } = require('../../shared/values');
+const { getValueDef, listValueDefs } = require('../../shared/config');
 const { escapeSlackMrkdwn } = require('../../shared/sanitize');
 
 const HYPE_HEADERS = [
@@ -34,7 +34,7 @@ function buildEyyyBlocks({
   valueKey,
   gifUrl,
 }) {
-  const value = getValueByKey(valueKey);
+  const value = getValueDef(valueKey) || listValueDefs()[0];
   const hypeHeader = HYPE_HEADERS[Math.floor(Math.random() * HYPE_HEADERS.length)];
 
   const resolvedRecipients = recipients.length > 0

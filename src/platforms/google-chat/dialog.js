@@ -1,4 +1,4 @@
-const { VALUES } = require('../../shared/values');
+const { listValueDefs } = require('../../shared/config');
 
 function buildRenderActionsDialog({
   submitUrl,
@@ -7,9 +7,9 @@ function buildRenderActionsDialog({
   recipientNames = [],
   prefilledMessage = '',
 } = {}) {
-  const valueItems = Object.entries(VALUES).map(([key, val]) => ({
-    text: `${val.emoji} ${val.name}`,
-    value: key,
+  const valueItems = listValueDefs().map((val) => ({
+    text: `${val.emoji} ${val.name}`.trim(),
+    value: val.key,
     selected: false,
   }));
 
@@ -42,7 +42,7 @@ function buildRenderActionsDialog({
         {
           selectionInput: {
             name: 'valueKey',
-            label: 'Which LOKAL value do they embody?',
+            label: 'Which value do they embody?',
             type: 'DROPDOWN',
             items: valueItems,
           },

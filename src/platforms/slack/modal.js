@@ -1,4 +1,4 @@
-const { VALUES } = require('../../shared/values');
+const { listValueDefs } = require('../../shared/config');
 
 const CALLBACK_ID = 'eyy_submit';
 const BLOCK_RECIPIENT = 'recipient_block';
@@ -16,9 +16,9 @@ function buildEyyyModal({
   prefilledUserIds = [],
   prefilledMessage = '',
 } = {}) {
-  const valueOptions = Object.entries(VALUES).map(([key, val]) => ({
-    text: { type: 'plain_text', text: `${val.emoji} ${val.name}`, emoji: true },
-    value: key,
+  const valueOptions = listValueDefs().map((val) => ({
+    text: { type: 'plain_text', text: `${val.emoji} ${val.name}`.trim(), emoji: true },
+    value: val.key,
   }));
 
   const recipientElement = {
@@ -64,7 +64,7 @@ function buildEyyyModal({
       {
         type: 'input',
         block_id: BLOCK_VALUE,
-        label: { type: 'plain_text', text: 'Which LOKAL value do they embody?', emoji: true },
+        label: { type: 'plain_text', text: 'Which value do they embody?', emoji: true },
         element: {
           type: 'static_select',
           action_id: ACTION_VALUE,

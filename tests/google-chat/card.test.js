@@ -39,8 +39,8 @@ describe('buildEyyyCard', () => {
   test('card body contains the value name and tagline', () => {
     const result = buildEyyyCard(input);
     const bodyText = JSON.stringify(result.cardsV2[0].card.sections);
-    expect(bodyText).toContain('Speed Is Our Advantage');
-    expect(bodyText).toContain('Move fast, win first');
+    expect(bodyText).toContain('Speed');
+    expect(bodyText).toContain('Move fast and deliver');
   });
 
   test('card contains the gif image', () => {

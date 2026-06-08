@@ -45,7 +45,7 @@ describe('buildLeaderboardCard', () => {
     expect(widgets.find((w) => w.image)).toBeUndefined();
     const preWidget = widgets.find((w) => w.textParagraph?.text?.includes('<pre>'));
     expect(preWidget).toBeDefined();
-    expect(preWidget.textParagraph.text).toContain('Kind by Default');
+    expect(preWidget.textParagraph.text).toContain('Kindness');
   });
 
   test('header includes sender name', async () => {
